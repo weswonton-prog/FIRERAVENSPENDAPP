@@ -1,0 +1,2923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>FireRaven</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#161826">
+<meta name="color-scheme" content="dark">
+<meta name="referrer" content="no-referrer">
+<!-- The app is one self-contained file that talks to exactly one host. Locking
+     that down means a malicious merchant name or pasted CSV can never phone
+     home, load a script, or frame anything. -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'none';
+  script-src 'self' 'unsafe-inline';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: blob:;
+  font-src 'self';
+  connect-src 'self' https://api.anthropic.com;
+  manifest-src 'self';
+  worker-src 'self';
+  base-uri 'none';
+  form-action 'none';
+  frame-ancestors 'none';
+  object-src 'none'">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FireRaven">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+/* ══════════════════════════════════════════════════════════════
+   FireRaven — Nocturne design system (dark blurple). Self-contained,
+   no build step, no external dependencies. All data lives on-device.
+   ══════════════════════════════════════════════════════════════ */
+:root{
+  color-scheme:dark;
+  --bg:#161826; --surface:#232532; --surface-2:#1c1a2c; --card:#232532;
+  --text:#e9e9ed; --muted:#8b8ea3; --faint:#6b6f84;
+  --accent:#9184d9; --accent-2:#b5abfc; --accent-soft:#3a3760;
+  --accent-800:#423a6a; --accent-900:#2b2741;
+  --good:#9fdcc0; --warn:#f5a623; --bad:#f0a6a6; --income:#79d6a8;
+  --save:#e8c07a; --save-dim:#3a3223;
+  --divider:rgba(255,255,255,.08);
+  --radius:14px; --radius-sm:10px;
+  --shadow-sm:0 0 0 1px rgba(255,255,255,.05);
+  --shadow-md:0 6px 20px rgba(0,0,0,.45);
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* Edge-to-edge: no frame, no hairline, no light-scheme gutter anywhere. */
+html{background:#161826;height:100%;overscroll-behavior-y:none;border:0}
+body{
+  height:100%;overscroll-behavior-y:none;border:0;
+  background:#161826;color:var(--text);
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;
+}
+#app{max-width:560px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;position:relative;
+  background:var(--bg);border:0;outline:0}
+.screen{flex:1;min-height:0;display:flex;flex-direction:column}
+.page{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:16px;
+  padding:calc(16px + var(--safe-top)) 18px calc(96px + var(--safe-bottom));-webkit-overflow-scrolling:touch}
+.page.nonav{padding-bottom:calc(24px + var(--safe-bottom))}
+.page::-webkit-scrollbar{width:0}
+h1,h2,h3,h4{font-weight:600;letter-spacing:-.015em;line-height:1.15}
+.h-title{font-size:22px;font-weight:700;letter-spacing:-.02em}
+.muted{color:var(--muted)}.faint{color:var(--faint)}
+.good{color:var(--good)}.bad{color:var(--bad)}.warn{color:var(--warn)}.income{color:var(--income)}
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+input,select,textarea{font-family:inherit}
+.row{display:flex;align-items:center;gap:12px}
+.between{display:flex;align-items:center;justify-content:space-between}
+.grow{flex:1;min-width:0}
+.nowrap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-size:14px;font-weight:600;
+  padding:10px 16px;border-radius:var(--radius-sm);transition:background .12s,opacity .12s;line-height:1.2}
+.btn:disabled{opacity:.45;pointer-events:none}
+.btn-primary{background:var(--accent);color:#161826}
+.btn-primary:active{background:var(--accent-2)}
+.btn-ghost{background:var(--surface);color:var(--text);box-shadow:var(--shadow-sm)}
+.btn-ghost:active{background:#2b2d3d}
+.btn-danger{background:transparent;color:var(--bad);box-shadow:inset 0 0 0 1px #5a3a3a}
+.btn-block{width:100%}
+.link{background:0;border:0;color:var(--accent-2);cursor:pointer;font:inherit;font-size:13px;padding:0;font-weight:600}
+.icon-btn{width:38px;height:38px;border-radius:50%;background:var(--surface);display:flex;align-items:center;
+  justify-content:center;color:var(--accent-2);flex:none;box-shadow:var(--shadow-sm)}
+.icon-btn:active{background:#2b2d3d}
+
+/* cards */
+.card{background:var(--card);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:12px}
+.card-tight{padding:14px;gap:10px}
+
+/* inputs */
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:12px;color:var(--muted);font-weight:500}
+.input{width:100%;min-height:44px;padding:10px 13px;font-size:15px;color:var(--text);
+  background:var(--surface);border:1px solid var(--divider);border-radius:var(--radius-sm);caret-color:var(--accent)}
+.input:focus{outline:none;border-color:var(--accent)}
+select.input{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b8ea3' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px}
+textarea.input{min-height:70px;resize:vertical}
+
+/* chips */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-size:13px;color:#a9acbe;background:var(--surface);border:1px solid transparent;border-radius:999px;
+  padding:8px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;line-height:1;transition:background .1s}
+.chip-on{color:#161826;background:var(--accent);border-color:var(--accent);font-weight:600}
+.chip-sm{padding:2px 9px;font-size:11px}
+
+/* tags */
+.tag{display:inline-flex;align-items:center;font-size:10px;font-weight:600;letter-spacing:.03em;
+  padding:2px 8px;border-radius:6px;line-height:1.4}
+.tag-review{border:1px solid var(--warn);color:var(--warn)}
+.tag-new{background:var(--accent-800);color:#f5f4ff}
+.tag-recur{background:#2b3a45;color:#8fd0e0}
+
+/* transaction rows */
+.tx{display:flex;align-items:center;gap:12px;padding:8px 6px;border-radius:var(--radius-sm);cursor:pointer;transition:background .1s}
+.tx:active{background:rgba(145,132,217,.09)}
+.tx-ic{width:40px;height:40px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;
+  font-size:19px;background:var(--surface)}
+.tx-amt{font-size:15px;font-weight:600;flex:none}
+.tx-sub{font-size:12px;color:var(--muted)}
+
+/* progress bar */
+.bar{height:8px;border-radius:5px;background:var(--surface);overflow:hidden}
+.bar>span{display:block;height:100%;border-radius:5px;transition:width .3s}
+
+/* raven mascot */
+.raven{background:center/contain no-repeat url("raven.png");image-rendering:auto;flex:none}
+
+/* bottom nav */
+.navbar{position:absolute;bottom:0;left:0;right:0;display:flex;align-items:flex-end;justify-content:space-between;
+  padding:8px 14px calc(8px + var(--safe-bottom));background:linear-gradient(to top,#191b29 62%,rgba(25,27,41,0));
+  border-top:1px solid rgba(255,255,255,.045);backdrop-filter:blur(10px)}
+.nav-i{display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--faint);font-size:9.5px;
+  font-weight:600;letter-spacing:.01em;background:0;border:0;cursor:pointer;padding:6px 2px;position:relative;flex:1}
+.nav-i.on{color:var(--accent)}
+.fab{width:54px;height:54px;border-radius:17px;background:var(--accent);color:#161826;display:flex;align-items:center;
+  justify-content:center;margin-bottom:4px;box-shadow:0 8px 22px rgba(145,132,217,.45)}
+.fab:active{background:var(--accent-2)}
+
+/* sheet / modal */
+.overlay{position:absolute;inset:0;z-index:60;background:rgba(13,15,24,.72);display:flex;align-items:flex-end;
+  animation:fade .15s ease}
+.sheet{background:var(--surface-2);width:100%;border-radius:22px 22px 0 0;padding:20px 20px calc(22px + var(--safe-bottom));
+  display:flex;flex-direction:column;gap:14px;box-shadow:0 -12px 40px rgba(0,0,0,.5);max-height:88%;overflow-y:auto;
+  animation:slideup .2s cubic-bezier(.2,.8,.2,1)}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes slideup{from{transform:translateY(24px)}to{transform:translateY(0)}}
+
+/* toast */
+#toast{position:fixed;left:50%;bottom:calc(96px + var(--safe-bottom));transform:translateX(-50%);z-index:200;
+  display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:calc(100% - 40px);max-width:480px}
+.toast{background:#2b2d3d;color:var(--text);font-size:13.5px;font-weight:500;padding:11px 16px;border-radius:12px;
+  box-shadow:var(--shadow-md);animation:fade .15s ease;max-width:100%;text-align:center;line-height:1.4}
+.toast.ok{box-shadow:var(--shadow-md),inset 0 0 0 1px rgba(159,220,192,.4)}
+.toast.err{box-shadow:var(--shadow-md),inset 0 0 0 1px rgba(240,166,166,.4)}
+
+/* misc */
+.glow{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(229,72,77,.32),transparent 66%);filter:blur(3px)}
+.dots{display:flex;gap:7px}
+.dots span{width:7px;height:7px;border-radius:50%;background:var(--accent-soft)}
+.dots span.on{background:var(--accent)}
+.typing{display:inline-flex;gap:4px;align-items:center;padding:4px 2px}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:blink 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,60%,100%{opacity:.25}30%{opacity:1}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.bubble{max-width:82%;padding:10px 13px;border-radius:15px;font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.b-ai{background:var(--surface);border-top-left-radius:4px;align-self:flex-start}
+.b-me{background:#3a3760;color:#f5f4ff;border-top-right-radius:4px;align-self:flex-end}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:40px 10px;color:var(--muted)}
+.kpi{font-size:38px;font-weight:700;letter-spacing:-.025em}
+.section-label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.donut text{fill:var(--text)}
+hr.rule{border:0;height:1px;background:var(--divider);margin:2px 0}
+.swatch{width:10px;height:10px;border-radius:3px;flex:none}
+
+/* ── v4 additions ───────────────────────────────────────────── */
+/* hero panels */
+.hero{border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:14px;position:relative;overflow:hidden}
+.hero-spend{background:linear-gradient(150deg,#2b2741 0%,#232532 55%,#1d1f2e 100%);box-shadow:var(--shadow-sm)}
+.hero-save{background:linear-gradient(150deg,#3a3223 0%,#282738 60%,#1f2130 100%);box-shadow:inset 0 0 0 1px rgba(232,192,122,.22)}
+.hero:after{content:'';position:absolute;top:-60px;right:-40px;width:150px;height:150px;border-radius:50%;
+  background:radial-gradient(circle,rgba(145,132,217,.22),transparent 70%);pointer-events:none}
+.hero-save:after{background:radial-gradient(circle,rgba(232,192,122,.18),transparent 70%)}
+
+/* stat grid */
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:var(--card);border-radius:var(--radius);padding:13px 14px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:3px}
+.stat b{font-size:19px;font-weight:700;letter-spacing:-.02em;line-height:1.2}
+.stat span{font-size:10.5px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+.stat small{font-size:11px;color:var(--faint)}
+
+/* section heading */
+.sec{display:flex;align-items:center;gap:9px;margin-top:6px}
+.sec h3{font-size:15.5px;font-weight:650;letter-spacing:-.015em}
+.sec .sec-ic{width:26px;height:26px;border-radius:8px;background:var(--accent-900);color:var(--accent-2);
+  display:flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+
+/* save / opportunity cards */
+.opp{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow-sm);display:flex;gap:12px;align-items:flex-start}
+.opp-ic{width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;
+  background:var(--save-dim);color:var(--save)}
+.opp-amt{font-size:13px;font-weight:700;color:var(--save);white-space:nowrap}
+.opp.done{opacity:.5}
+.opp.done .opp-title{text-decoration:line-through}
+
+/* sub rows */
+.sub{display:flex;align-items:center;gap:11px;padding:11px 0}
+.sub+.sub{border-top:1px solid var(--divider)}
+.sub.off .sub-name{text-decoration:line-through;color:var(--muted)}
+.btn-mini{font-size:11px;font-weight:600;padding:6px 11px;border-radius:8px;background:var(--surface);
+  box-shadow:var(--shadow-sm);color:var(--muted);flex:none}
+.btn-mini.on{background:var(--save-dim);color:var(--save);box-shadow:inset 0 0 0 1px rgba(232,192,122,.35)}
+
+/* day-of-week + daily bars */
+.dow{display:flex;align-items:flex-end;gap:6px;height:78px}
+.dow-b{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;justify-content:flex-end}
+.dow-b i{width:100%;max-width:22px;border-radius:4px;background:var(--accent-soft);display:block}
+.dow-b i.hi{background:var(--accent)}
+.dow-b span{font-size:9px;color:var(--muted)}
+.spark{display:flex;align-items:flex-end;gap:2px;height:44px}
+.spark i{flex:1;border-radius:2px;background:var(--accent-soft);min-height:2px}
+.spark i.today{background:var(--accent-2)}
+
+/* delta pills */
+.delta{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;white-space:nowrap}
+.delta.up{background:rgba(240,166,166,.14);color:var(--bad)}
+.delta.down{background:rgba(159,220,192,.14);color:var(--good)}
+.delta.flat{background:var(--surface);color:var(--muted)}
+
+/* segmented control */
+.seg{display:flex;background:var(--surface);border-radius:11px;padding:3px;gap:3px}
+.seg button{flex:1;font-size:12.5px;font-weight:600;padding:8px 4px;border-radius:9px;color:var(--muted)}
+.seg button.on{background:var(--accent-900);color:var(--accent-2)}
+
+/* PIN lock */
+.lock{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;
+  padding:calc(30px + var(--safe-top)) 26px calc(30px + var(--safe-bottom))}
+.pin-dots{display:flex;gap:15px}
+.pin-dots i{width:13px;height:13px;border-radius:50%;background:var(--accent-soft);transition:background .12s,transform .12s}
+.pin-dots i.on{background:var(--accent);transform:scale(1.14)}
+.pin-dots.bad i{background:var(--bad)}
+.shake{animation:shake .38s cubic-bezier(.36,.07,.19,.97)}
+@keyframes shake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-7px)}40%,60%{transform:translateX(7px)}}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%;max-width:270px}
+.pad button{height:64px;border-radius:50%;font-size:25px;font-weight:500;background:var(--surface);
+  box-shadow:var(--shadow-sm);display:flex;align-items:center;justify-content:center;transition:background .1s}
+.pad button:active{background:var(--accent-900)}
+.pad button.blank{background:none;box-shadow:none;pointer-events:none}
+.pad button.fn{font-size:13px;font-weight:600;background:none;box-shadow:none;color:var(--muted)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast"></div>
+<input id="img-input" type="file" accept="image/*" multiple hidden>
+<input id="cam-input" type="file" accept="image/*" capture="environment" hidden>
+<input id="restore-input" type="file" accept="application/json,.json" hidden>
+
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════════
+   FireRaven — personal spend tracker (v3, dependency-free rebuild)
+   Data model, persistence, AI transport, analytics, and UI in one file.
+   ════════════════════════════════════════════════════════════════════ */
+
+// ---- constants ----------------------------------------------------------
+const LS_KEY = 'fireraven_v2';
+const LS_KEY_LEGACY = 'fireraven_v1';
+const LS_APIKEY = 'fireraven_key';
+const LS_PIN = 'fireraven_pin';     // { salt, hash, iters } — never the PIN itself
+const LS_SEEN = 'fireraven_seen';   // last-active timestamp, for auto-lock
+const LS_FAIL = 'fireraven_fail';   // { n, until } — PIN attempt throttling
+const APP_VERSION = 5;
+
+/* ── App lock ──────────────────────────────────────────────────────────
+   The starting PIN is 1177, but this repository is public, so only a
+   PBKDF2-SHA256 *verifier* is stored here — never the digits. The app
+   only ever needs to CHECK a PIN, never to recover it, so the plaintext
+   has no reason to exist in source control.
+   This is a device lock, not encryption: it keeps a person holding your
+   unlocked phone out of your finances. Change it in Settings → App lock. */
+const PIN_DEFAULT = { salt:'fireraven-pin-v1-9c4e2a', iters:210000,
+  hash:'761acfcab36c3dcd860bdc4bef156246dfb6bc8eb4c6654e2e086f42b6d8f052' };
+
+const DEFAULT_CATS = [
+  { name:'Groceries',     color:'#9184d9', icon:'🛒' },
+  { name:'Dining',        color:'#b5abfc', icon:'🍽️' },
+  { name:'Transport',     color:'#6c63a6', icon:'🚗' },
+  { name:'Shopping',      color:'#7c88c0', icon:'🛍️' },
+  { name:'Subscriptions', color:'#8a7fd0', icon:'🔁' },
+  { name:'Bills',         color:'#5d5294', icon:'🧾' },
+  { name:'Health',        color:'#6ec2a0', icon:'➕' },
+  { name:'Entertainment', color:'#c98fd0', icon:'🎬' },
+  { name:'Other',         color:'#5a5d78', icon:'•'  },
+];
+const DEFAULT_INCOME_CATS = [
+  { name:'Salary',      color:'#79d6a8', icon:'💼' },
+  { name:'Freelance',   color:'#6ec2a0', icon:'✍️' },
+  { name:'Side income', color:'#5aa8e0', icon:'⚡' },
+  { name:'Investments', color:'#e0b15a', icon:'📈' },
+  { name:'Benefits',    color:'#8a7fd0', icon:'🏛️' },
+  { name:'Other',       color:'#5a5d78', icon:'•'  },
+];
+// How many times a year each cadence occurs, expressed per month.
+const CADENCE = {
+  weekly:      { per:52/12, label:'Weekly' },
+  biweekly:    { per:26/12, label:'Every 2 weeks' },
+  semimonthly: { per:2,     label:'Twice a month' },
+  monthly:     { per:1,     label:'Monthly' },
+  quarterly:   { per:1/3,   label:'Quarterly' },
+  semiannual:  { per:1/6,   label:'Every 6 months' },
+  annual:      { per:1/12,  label:'Yearly' },
+};
+const CADENCE_KEYS = Object.keys(CADENCE);
+function perMonth(amount, cadence){ return (Number(amount)||0) * ((CADENCE[cadence]||CADENCE.monthly).per); }
+function cadenceLabel(c){ return (CADENCE[c]||CADENCE.monthly).label; }
+
+const SWATCHES = ['#9184d9','#b5abfc','#6c63a6','#7c88c0','#8a7fd0','#5d5294','#6ec2a0','#c98fd0','#e0a05a','#5aa8e0','#e07a9a','#5a5d78'];
+const MODELS = [
+  { id:'claude-haiku-4-5',  label:'Haiku 4.5 — fastest & cheapest' },
+  { id:'claude-sonnet-5',   label:'Sonnet 5 — best accuracy' },
+  { id:'claude-opus-4-8',   label:'Opus 4.8 — most capable' },
+];
+const MON_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MON_LONG  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+// ---- state --------------------------------------------------------------
+// Persisted in S.data; transient UI in S.ui.
+let S = {
+  data: null,   // { onboarded, settings, categories, merchantMap, txs, messages }
+  apiKey: '',
+  ui: {
+    screen: 'home', obStep: 0,
+    month: null,               // 'YYYY-MM' selected in Home/Insights/Activity
+    addTab: 'upload',
+    scan: { state:'idle', pct:0, msg:'', file:'', error:'', added:0, review:0 },
+    add: { merchant:'', amount:'', cat:'Groceries', type:'expense', date:'', note:'' },
+    modal: null,               // { kind, ... }
+    search: '', filterCat: 'All',
+    draft: '',
+    reviewSel: {},
+    saveTab: 'ideas',          // Save screen: ideas | subs | leaks
+    pin: '', pinBad:false, pinMode:'unlock', pinStage:0, pinFirst:'',
+    aiBusy: false,
+  },
+  locked: false,
+  _timer: null,
+};
+
+// ---- utilities ----------------------------------------------------------
+const $ = (sel) => document.querySelector(sel);
+const uid = (p) => p + Math.random().toString(36).slice(2, 9);
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function cur(){ return (S.data && S.data.settings.currency) || 'CAD'; }
+function locale(){ return (S.data && S.data.settings.locale) || 'en-CA'; }
+function money(n, opts){
+  const val = Number(n) || 0;
+  try {
+    return new Intl.NumberFormat(locale(), Object.assign({ style:'currency', currency:cur(), currencyDisplay:'narrowSymbol' }, opts||{})).format(val);
+  } catch (e){
+    return '$' + val.toFixed(2);
+  }
+}
+const money0 = (n) => money(n, { minimumFractionDigits:0, maximumFractionDigits:0 });
+
+// dates are ISO 'YYYY-MM-DD'
+function todayISO(){ const d=new Date(); return isoFrom(d); }
+function isoFrom(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function monthKey(iso){ return (iso||'').slice(0,7); }
+function curMonthKey(){ return todayISO().slice(0,7); }
+function fmtDate(iso){
+  const p = (iso||'').split('-'); if (p.length<3) return iso||'';
+  return MON_SHORT[(+p[1])-1] + ' ' + (+p[2]);
+}
+function monthLabel(key){
+  const p=(key||'').split('-'); if(p.length<2) return '';
+  return MON_LONG[(+p[1])-1] + ' ' + p[0];
+}
+function monthShiftKey(key, delta){
+  const p=(key||curMonthKey()).split('-'); let y=+p[0], m=(+p[1])-1+delta;
+  y += Math.floor(m/12); m=((m%12)+12)%12;
+  return y+'-'+String(m+1).padStart(2,'0');
+}
+// Build an ISO date, clamping to something real. An out-of-range month or day
+// would otherwise produce a string like "2026-14-07", which passes a naive
+// format check and then silently corrupts every month total and sort.
+function mkISO(y, mo, d){
+  y = Math.min(2999, Math.max(1970, y|0));
+  mo = Math.min(12, Math.max(1, mo|0));
+  const maxD = new Date(y, mo, 0).getDate();
+  d = Math.min(maxD, Math.max(1, d|0));
+  return y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+}
+function isValidISO(s){
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s||'')) return false;
+  const [y,mo,d]=s.split('-').map(Number);
+  return mo>=1 && mo<=12 && d>=1 && d<=new Date(y,mo,0).getDate();
+}
+// parse a loose date string ("Oct 18", "2025-10-18", "18/10/2025") into ISO
+function parseLooseDate(str){
+  if (!str) return todayISO();
+  str = String(str).trim();
+  let m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); // ISO
+  if (m) return mkISO(+m[1], +m[2], +m[3]);
+  // Numeric d/m/y or m/d/y. Canadian receipts use both, so infer from the
+  // values: a first part >12 can only be a day, a second part >12 only a day.
+  // Genuinely ambiguous dates fall back to month-first.
+  m = str.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  if (m){
+    let y=+(m[3].length===2?'20'+m[3]:m[3]);
+    const a=+m[1], b=+m[2];
+    const dayFirst = a>12 || (b<=12 && false);
+    return dayFirst ? mkISO(y, b, a) : mkISO(y, a, b);
+  }
+  m = str.match(/([A-Za-z]{3,})\.?\s+(\d{1,2})(?:,?\s*(\d{4}))?/); // "Oct 18" / "October 18, 2025"
+  if (m){
+    const mi = MON_SHORT.findIndex(x=>x.toLowerCase()===m[1].slice(0,3).toLowerCase());
+    if (mi>=0){
+      const day=+m[2], now=new Date();
+      let year = m[3] ? +m[3] : now.getFullYear();
+      if (!m[3]){ // no year: if that date is in the future, assume last year
+        const cand=new Date(year, mi, day);
+        if (cand.getTime() > now.getTime()+86400000) year--;
+      }
+      return mkISO(year, mi+1, day);
+    }
+  }
+  const d = new Date(str);
+  return isNaN(d) ? todayISO() : isoFrom(d);
+}
+
+function normMerchant(m){
+  return String(m||'').toLowerCase()
+    .replace(/[#*]/g,' ').replace(/\b\d[\d.,-]*\b/g,' ')  // drop store codes / numbers
+    .replace(/\b(pos|purchase|inc|ltd|llc|co|the|store|payment|debit|visa|mastercard)\b/g,' ')
+    .replace(/[^a-z\s]/g,' ').replace(/\s+/g,' ').trim().split(' ').slice(0,3).join(' ');
+}
+
+function toast(msg, kind){
+  const el = document.createElement('div');
+  el.className = 'toast' + (kind ? ' '+kind : '');
+  el.textContent = msg;
+  $('#toast').appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); }, 2600);
+}
+
+// ---- persistence & migration -------------------------------------------
+function freshData(){
+  return {
+    onboarded: false,
+    settings: { currency:'CAD', locale:'en-CA', monthlyBudget:1600, insightsOn:true, model:'claude-haiku-4-5',
+                lockOn:true, autoLockMin:3, savingsGoal:0, startingBalance:0, forecastMonths:12 },
+    categories: DEFAULT_CATS.map(c=>({ name:c.name, color:c.color, icon:c.icon, budget:0 })),
+    incomeCats: DEFAULT_INCOME_CATS.slice(),
+    income: [],        // { id, name, category, amount, cadence, active, note }
+    recur:  [],        // { id, name, category, amount, cadence, nextDate, active, note }
+    merchantMap: {},
+    subState: {},      // normalized merchant key -> 'cancelled'
+    savings:  null,    // { at, items:[{buy, alt, why, save}] } — cached AI suggestions
+    done:     {},      // dismissed/actioned savings opportunities, id -> true
+    txs: [],
+    messages: [{ role:'ai', text:"Hi Wes — I'm FireRaven, your money assistant. I read bank screenshots, sort every purchase, and answer questions about where your money goes. Add some transactions or ask me anything." }],
+  };
+}
+function load(){
+  try { S.apiKey = localStorage.getItem(LS_APIKEY) || ''; } catch(e){}
+  let raw = null;
+  try { raw = localStorage.getItem(LS_KEY); } catch(e){}
+  if (raw){
+    try { S.data = normalizeData(JSON.parse(raw)); return; } catch(e){}
+  }
+  // migrate legacy v1 schema
+  try {
+    const old = localStorage.getItem(LS_KEY_LEGACY);
+    if (old){ S.data = migrateV1(JSON.parse(old)); save(); return; }
+  } catch(e){}
+  S.data = freshData();
+}
+function normalizeData(d){
+  const base = freshData();
+  const out = {
+    onboarded: !!d.onboarded,
+    settings: Object.assign(base.settings, d.settings||{}),
+    categories: Array.isArray(d.categories)&&d.categories.length ? d.categories : base.categories,
+    incomeCats: Array.isArray(d.incomeCats)&&d.incomeCats.length ? d.incomeCats : base.incomeCats,
+    income: Array.isArray(d.income) ? d.income.map(normalizeStream) : [],
+    recur:  Array.isArray(d.recur)  ? d.recur.map(normalizeStream)  : [],
+    merchantMap: d.merchantMap || {},
+    subState: d.subState || {},
+    savings: d.savings || null,
+    done: d.done || {},
+    txs: Array.isArray(d.txs) ? d.txs.map(normalizeTx) : [],
+    messages: Array.isArray(d.messages)&&d.messages.length ? d.messages : base.messages,
+  };
+  return out;
+}
+
+// ---- app lock (PBKDF2-SHA256 verifier; the PIN itself is never stored) ---
+function pinRecord(){
+  try { const r=JSON.parse(localStorage.getItem(LS_PIN)||'null'); if (r&&r.hash&&r.salt&&r.iters) return r; } catch(e){}
+  return PIN_DEFAULT;
+}
+function toHex(buf){ return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
+async function pinHash(pin, salt, iters){
+  const enc = new TextEncoder();
+  const km = await crypto.subtle.importKey('raw', enc.encode(String(pin)), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits(
+    { name:'PBKDF2', salt:enc.encode(salt), iterations:iters, hash:'SHA-256' }, km, 256);
+  return toHex(bits);
+}
+async function pinVerify(pin){
+  const r = pinRecord();
+  try { return (await pinHash(pin, r.salt, r.iters)) === r.hash; }
+  catch(e){ return false; }               // no WebCrypto (insecure origin) → fail closed
+}
+async function pinSet(pin){
+  const salt = 'fr-' + toHex(crypto.getRandomValues(new Uint8Array(12)));
+  const iters = 210000;
+  const hash = await pinHash(pin, salt, iters);
+  try { localStorage.setItem(LS_PIN, JSON.stringify({ salt, iters, hash })); } catch(e){}
+}
+// WebCrypto only exists on secure origins (https / localhost). Without it we
+// cannot verify a PIN — so we must not lock, or the app would be unopenable.
+function cryptoOK(){ return !!(window.crypto && crypto.subtle && crypto.subtle.deriveBits); }
+function lockEnabled(){ return !!(S.data && S.data.settings.lockOn) && cryptoOK(); }
+
+/* Guessing throttle. A 4-digit PIN is only 10,000 combinations, so without a
+   delay someone could sit and tap through them. After 4 wrong tries the pad
+   locks out, doubling each time up to 5 minutes. Stored so it survives a
+   reload — closing the tab must not reset the penalty. */
+function failState(){
+  try { const f=JSON.parse(localStorage.getItem(LS_FAIL)||'null'); if (f&&typeof f.n==='number') return f; } catch(e){}
+  return { n:0, until:0 };
+}
+function lockoutLeft(){
+  const f=failState();
+  return f.until>Date.now() ? Math.ceil((f.until-Date.now())/1000) : 0;
+}
+function noteFail(){
+  const f=failState();
+  f.n++;
+  if (f.n>=4) f.until = Date.now() + Math.min(300, Math.pow(2, f.n-3)*15)*1000;
+  try { localStorage.setItem(LS_FAIL, JSON.stringify(f)); } catch(e){}
+}
+function clearFails(){ try { localStorage.removeItem(LS_FAIL); } catch(e){} }
+function touchSeen(){ try{ localStorage.setItem(LS_SEEN, String(Date.now())); }catch(e){} }
+function shouldRelock(){
+  if (!lockEnabled()) return false;
+  let last = 0; try { last = +(localStorage.getItem(LS_SEEN)||0); } catch(e){}
+  const mins = Number(S.data.settings.autoLockMin);
+  if (!last) return true;
+  if (mins <= 0) return false;                      // "never" while the tab lives
+  return (Date.now() - last) > mins*60000;
+}
+// Shared shape for income sources and manual recurring bills.
+function normalizeStream(s){
+  return {
+    id: s.id || uid('s'),
+    name: String(s.name||'Untitled').slice(0,60),
+    category: s.category || null,
+    amount: Math.abs(Number(s.amount))||0,
+    cadence: CADENCE[s.cadence] ? s.cadence : 'monthly',
+    nextDate: isValidISO(s.nextDate) ? s.nextDate : '',
+    active: s.active !== false,
+    note: String(s.note||'').slice(0,120),
+  };
+}
+function normalizeTx(t){
+  return {
+    id: t.id || uid('t'),
+    merchant: String(t.merchant||'Unknown').slice(0,60),
+    category: t.category || null,
+    amount: Math.abs(Number(t.amount))||0,
+    type: t.type==='income'?'income':'expense',
+    date: isValidISO(t.date) ? t.date : parseLooseDate(t.date),
+    note: t.note || '',
+    needsReview: !!t.needsReview,
+    source: t.source || 'manual',
+    demo: !!t.demo,
+  };
+}
+function migrateV1(d){
+  const out = freshData();
+  out.onboarded = !!d.obDone;
+  out.settings.monthlyBudget = d.budget || 1600;
+  out.settings.insightsOn = d.insightsOn !== false;
+  if (Array.isArray(d.messages) && d.messages.length) out.messages = d.messages;
+  out.txs = (Array.isArray(d.txs)?d.txs:[]).map(t => normalizeTx({
+    id: t.id, merchant: t.merchant, category: t.category, amount: t.amount,
+    date: parseLooseDate(t.date), type:'expense',
+    needsReview: !!t.needsReview, source: t.imported?'import':'seed',
+  }));
+  return out;
+}
+function save(){
+  try { localStorage.setItem(LS_KEY, JSON.stringify(S.data)); } catch(e){}
+}
+
+// ---- category helpers ---------------------------------------------------
+function cats(){ return S.data.categories; }
+function catNames(){ return cats().map(c=>c.name); }
+function catBy(name){ return cats().find(c=>c.name===name) || { name:name||'Other', color:'#5a5d78', icon:'•', budget:0 }; }
+function learnMerchant(merchant, category){
+  if (!category) return;
+  const k = normMerchant(merchant);
+  if (k) { S.data.merchantMap[k] = category; }
+}
+function guessCategory(merchant){
+  const k = normMerchant(merchant);
+  if (k && S.data.merchantMap[k]) return { cat:S.data.merchantMap[k], learned:true };
+  const s = (merchant||'').toLowerCase();
+  const kw = [
+    [/cafe|coffee|tim horton|starbuck|restaurant|dining|grill|sushi|pizza|mcdonald|keg|bar\b|pub|kitchen|eatery|uber eats|doordash|skip/, 'Dining'],
+    [/loblaw|metro|costco|grocery|market|mrkt|walmart|superstore|no frills|food basics|sobey/, 'Groceries'],
+    [/uber|lyft|presto|petro|shell|esso|gas\b|transit|parking|via rail|airline|air canada/, 'Transport'],
+    [/netflix|spotify|prime|disney|apple\.com|youtube|patreon|subscription|adobe|icloud/, 'Subscriptions'],
+    [/hydro|rogers|bell|telus|fido|insurance|utility|internet|mortgage|rent\b/, 'Bills'],
+    [/pharma|shoppers|clinic|dental|doctor|gym|fitness|health/, 'Health'],
+    [/cinema|cineplex|theatre|steam|nintendo|playstation|xbox|concert|ticket/, 'Entertainment'],
+    [/amazon|amzn|uniqlo|canadian tire|best buy|ikea|store|shop/, 'Shopping'],
+  ];
+  for (const [re,c] of kw) if (re.test(s) && catNames().includes(c)) return { cat:c, learned:false };
+  return { cat:null, learned:false };
+}
+
+// ---- analytics ----------------------------------------------------------
+function monthTxs(key){ return S.data.txs.filter(t=>monthKey(t.date)===key); }
+function sumExpenses(list){ return list.filter(t=>t.type!=='income').reduce((a,t)=>a+t.amount,0); }
+function sumIncome(list){ return list.filter(t=>t.type==='income').reduce((a,t)=>a+t.amount,0); }
+function categoryTotals(list){
+  const tot={};
+  list.filter(t=>t.type!=='income'&&t.category).forEach(t=>{ tot[t.category]=(tot[t.category]||0)+t.amount; });
+  return Object.keys(tot).map(name=>({ name, amount:tot[name], color:catBy(name).color, icon:catBy(name).icon }))
+    .sort((a,b)=>b.amount-a.amount);
+}
+function trend(months){
+  const out=[]; let k=curMonthKey();
+  for (let i=months-1;i>=0;i--){
+    const key=monthShiftKey(curMonthKey(), -i);
+    out.push({ key, label:MON_SHORT[(+key.split('-')[1])-1], value:sumExpenses(monthTxs(key)) });
+  }
+  return out;
+}
+// Every distinct merchant, aggregated across all history.
+function merchantStats(){
+  const g={};
+  S.data.txs.filter(t=>t.type!=='income').forEach(t=>{
+    const k=normMerchant(t.merchant)||t.merchant.toLowerCase();
+    const e = g[k] || (g[k]={ key:k, name:t.merchant, months:new Set(), dates:[], amts:[], cat:t.category, count:0 });
+    e.months.add(monthKey(t.date)); e.dates.push(t.date); e.amts.push(t.amount);
+    e.count++; e.name=t.merchant;
+    if (t.category) e.cat=t.category;
+  });
+  return Object.values(g).map(e=>{
+    const total=e.amts.reduce((a,b)=>a+b,0);
+    const nMonths=Math.max(1,e.months.size);
+    const mean=total/e.count;
+    // coefficient of variation — a real subscription bills the same amount every time
+    const sd=Math.sqrt(e.amts.reduce((a,x)=>a+(x-mean)*(x-mean),0)/e.count);
+    e.dates.sort();
+    return { key:e.key, name:e.name, cat:e.cat, count:e.count, total,
+             avg: mean, monthly: total/nMonths, nMonths, cv: mean?sd/mean:1,
+             last: e.dates[e.dates.length-1], first: e.dates[0] };
+  }).sort((a,b)=>b.total-a.total);
+}
+// Brands that are a recurring commitment regardless of how they were categorized.
+const SUB_BRANDS = /netflix|spotify|disney|crave|prime|hulu|paramount|apple ?(tv|music|one)|icloud|youtube|adobe|dropbox|patreon|audible|xbox|playstation|nintendo|google one|microsoft|notion|figma|rogers|bell|telus|fido|koodo|virgin|hydro|enbridge|insurance|mortgage|rent\b|gym|goodlife|fitness|planet fit|storage/i;
+
+// Recurring = same merchant in >=2 distinct months (or tagged Subscriptions),
+// with a steady amount. Amount stability separates a real subscription from
+// "I happen to shop at Loblaws every month".
+function recurring(){
+  return merchantStats().filter(m=>m.nMonths>=2 || m.cat==='Subscriptions').map(m=>{
+    const monthly = m.total/m.nMonths;
+    const branded = SUB_BRANDS.test(m.name);
+    // A commitment is a bill you signed up for — not just a shop you visit often.
+    // Category or brand establishes intent; a near-constant amount confirms it.
+    const committed = m.cat==='Subscriptions' || branded ||
+                      (m.cat==='Bills' && m.count<=m.nMonths*1.3 && m.cv<0.15);
+    const steady = committed && m.count <= m.nMonths*1.5;
+    return Object.assign({}, m, {
+      monthly, annual: monthly*12, steady, committed, branded,
+      next: nextDue(m.last),
+      cancelled: S.data.subState[m.key]==='cancelled',
+    });
+  }).sort((a,b)=>b.annual-a.annual);
+}
+// Real recurring commitments you could cancel.
+function subscriptions(){ return recurring().filter(r=>r.steady); }
+// Merchants you simply visit often — useful to see, but not cancellable.
+function regulars(){ return recurring().filter(r=>!r.steady && r.nMonths>=2).slice(0,8); }
+function nextDue(lastISO){
+  if (!lastISO) return '';
+  const p=lastISO.split('-'); const d=new Date(+p[0], +p[1]-1, +p[2]);
+  while (d.getTime() < Date.now()) d.setMonth(d.getMonth()+1);
+  return isoFrom(d);
+}
+
+// Income vs expense for a month, plus savings rate.
+function cashflow(key){
+  const l=monthTxs(key);
+  const income=sumIncome(l), spent=sumExpenses(l);
+  return { income, spent, net:income-spent, rate: income>0 ? (income-spent)/income*100 : null };
+}
+// Spend by weekday (0=Sun).
+function dowTotals(list){
+  const out=[0,0,0,0,0,0,0], n=[0,0,0,0,0,0,0];
+  list.filter(t=>t.type!=='income').forEach(t=>{
+    const p=t.date.split('-'); const d=new Date(+p[0],+p[1]-1,+p[2]).getDay();
+    out[d]+=t.amount; n[d]++;
+  });
+  return out.map((v,i)=>({ total:v, count:n[i], label:['S','M','T','W','T','F','S'][i] }));
+}
+// Spend per calendar day of a month.
+function dailyTotals(key){
+  const p=key.split('-'); const days=new Date(+p[0], +p[1], 0).getDate();
+  const out=new Array(days).fill(0);
+  monthTxs(key).filter(t=>t.type!=='income').forEach(t=>{ const d=+t.date.slice(8,10); if (d>=1&&d<=days) out[d-1]+=t.amount; });
+  return out;
+}
+// Category movement vs the previous month.
+function catDeltas(key){
+  const now={}, prev={};
+  monthTxs(key).filter(t=>t.type!=='income'&&t.category).forEach(t=>now[t.category]=(now[t.category]||0)+t.amount);
+  monthTxs(monthShiftKey(key,-1)).filter(t=>t.type!=='income'&&t.category).forEach(t=>prev[t.category]=(prev[t.category]||0)+t.amount);
+  const names=[...new Set([...Object.keys(now),...Object.keys(prev)])];
+  return names.map(n=>{
+    const a=now[n]||0, b=prev[n]||0;
+    return { name:n, now:a, prev:b, delta:a-b, pct: b>0 ? (a-b)/b*100 : (a>0?100:0), color:catBy(n).color, icon:catBy(n).icon };
+  }).sort((x,y)=>Math.abs(y.delta)-Math.abs(x.delta));
+}
+// The number that actually changes daily behaviour: what's left, per day left.
+function safeToSpend(key){
+  if (key!==curMonthKey()) return null;
+  const budget=S.data.settings.monthlyBudget; if (!budget) return null;
+  const now=new Date(), day=now.getDate();
+  const daysIn=new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const left=Math.max(0, daysIn-day+1);
+  const remaining=budget-sumExpenses(monthTxs(key));
+  return { remaining, perDay: left>0 ? remaining/left : remaining, daysLeft:left, daysIn, day, over:remaining<0 };
+}
+
+// ---- savings engine -----------------------------------------------------
+// Deterministic, evidence-based opportunities derived from real transactions.
+// Each has a stable id so "done" can be remembered.
+function spendingLeaks(){
+  const out=[];
+  const key=curMonthKey();
+  const months=[...new Set(S.data.txs.map(t=>monthKey(t.date)))].sort().slice(-3);
+  const recent=S.data.txs.filter(t=>t.type!=='income'&&months.includes(monthKey(t.date)));
+  const nM=Math.max(1,months.length);
+  const perMonth=(amt)=>amt/nM;
+  const ms=merchantStats();
+
+  // 1. Frequent small buys — the classic latte-factor, but measured.
+  ms.filter(m=>m.count>=6 && m.avg<25).slice(0,3).forEach(m=>{
+    const mo=m.monthly;
+    if (mo<20) return;
+    out.push({ id:'freq-'+m.key, icon:'☕', kind:'habit',
+      title:`${m.name} — ${m.count} visits`,
+      detail:`Small buys averaging ${money(m.avg)} add up to about ${money0(mo)}/mo. Halving the visits saves ${money0(mo*0.5)}/mo.`,
+      save: mo*0.5 });
+  });
+
+  // 2. Dining vs groceries balance.
+  const dining=perMonth(recent.filter(t=>t.category==='Dining').reduce((a,t)=>a+t.amount,0));
+  const groc  =perMonth(recent.filter(t=>t.category==='Groceries').reduce((a,t)=>a+t.amount,0));
+  if (dining>0 && dining>groc*0.6){
+    const target=Math.max(groc*0.5, dining*0.65);
+    out.push({ id:'dining-ratio', icon:'🍽️', kind:'habit',
+      title:'Dining out is outpacing groceries',
+      detail:`You spend ${money0(dining)}/mo eating out vs ${money0(groc)}/mo on groceries. Shifting a third of those meals home saves about ${money0(dining-target)}/mo.`,
+      save: dining-target });
+  }
+
+  // 3. Unused / duplicate subscriptions.
+  const subs=subscriptions().filter(s=>!s.cancelled);
+  const streaming=subs.filter(s=>/netflix|disney|crave|prime|hulu|paramount|apple tv|spotify|youtube|tidal|deezer/i.test(s.name));
+  if (streaming.length>=2){
+    const cheapest=streaming.slice().sort((a,b)=>a.monthly-b.monthly);
+    const drop=cheapest.slice(0, streaming.length-1).reduce((a,s)=>a+s.monthly,0);
+    out.push({ id:'stream-stack', icon:'📺', kind:'subscription',
+      title:`${streaming.length} streaming services at once`,
+      detail:`${streaming.map(s=>esc(s.name)).join(', ')} cost ${money0(streaming.reduce((a,s)=>a+s.monthly,0))}/mo together. Rotating one at a time — keep one, cancel the rest — saves ${money0(drop)}/mo.`,
+      save: drop });
+  }
+  // Don't double-count: anything already covered by the streaming suggestion.
+  const covered=new Set(streaming.map(s=>s.key));
+  subs.filter(s=>s.monthly>=8 && !covered.has(s.key)).slice(0,4).forEach(s=>{
+    out.push({ id:'sub-'+s.key, icon:'🔁', kind:'subscription',
+      title:`${s.name} — ${money(s.monthly)}/mo`,
+      detail:`That's ${money0(s.annual)} a year. Most services are 15–20% cheaper billed annually, and the ad-supported tier usually costs about 40% less.`,
+      save: s.monthly*0.35 });
+  });
+
+  // 4. A category genuinely running hot — measured against its own recent
+  //    baseline, and pro-rated so a half-finished month isn't compared to a
+  //    full one. Only half the excess is claimed as savings; the rest is noise.
+  const prior=[1,2,3].map(i=>monthShiftKey(key,-i))
+    .map(k=>({ k, txs:monthTxs(k) })).filter(m=>m.txs.length>=3);
+  if (prior.length>=1){
+    const now=new Date();
+    const partial = key===curMonthKey();
+    const daysIn=new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+    const frac = partial ? Math.min(1, now.getDate()/daysIn) : 1;
+    const catNow={}; monthTxs(key).filter(t=>t.type!=='income'&&t.category)
+      .forEach(t=>catNow[t.category]=(catNow[t.category]||0)+t.amount);
+    let best=null;
+    Object.keys(catNow).forEach(name=>{
+      const base = prior.reduce((a,m)=>a+m.txs.filter(t=>t.category===name&&t.type!=='income')
+        .reduce((x,t)=>x+t.amount,0),0)/prior.length;
+      if (base<25) return;                       // too small a baseline to trust
+      const pace = catNow[name]/frac;            // where this month is heading
+      const excess = pace-base;
+      if (excess>base*0.3 && excess>25 && (!best||excess>best.excess))
+        best={ name, base, pace, excess, now:catNow[name] };
+    });
+    if (best) out.push({ id:'pace-'+best.name, icon:'📈', kind:'trend',
+      title:`${best.name} is running ${Math.round(best.excess/best.base*100)}% hot`,
+      detail:`${money0(best.now)} so far this month, pacing toward ${money0(best.pace)} against a ${money0(best.base)} average over the last ${prior.length} month${prior.length===1?'':'s'}. Pulling back to your normal level saves about ${money0(best.excess*0.5)}.`,
+      save: best.excess*0.5 });
+  }
+
+  // 5. Weekend overspend.
+  const dow=dowTotals(recent);
+  const wknd=(dow[0].total+dow[6].total), wk=dow.slice(1,6).reduce((a,d)=>a+d.total,0);
+  if (wknd>0 && wknd/2 > (wk/5)*1.6){
+    const excess=perMonth(wknd - (wk/5)*2*1.2);
+    if (excess>15) out.push({ id:'weekend', icon:'🗓️', kind:'habit',
+      title:'Weekends cost you the most',
+      detail:`Saturday and Sunday run about ${Math.round((wknd/2)/(wk/5)*100-100)}% higher per day than weekdays. Setting a weekend cap would keep roughly ${money0(excess)}/mo.`,
+      save: excess });
+  }
+
+  // 6. Fees — pure waste, always worth flagging.
+  // \b matters: "coffee" must not read as "fee".
+  const fees=recent.filter(t=>/\bfees?\b|\binterest\b|overdraft|\bnsf\b|late charge|service charge|annual fee/i.test(t.merchant));
+  if (fees.length){
+    const mo=perMonth(fees.reduce((a,t)=>a+t.amount,0));
+    out.push({ id:'fees', icon:'⚠️', kind:'waste',
+      title:`${fees.length} fee charge${fees.length===1?'':'s'}`,
+      detail:`${money0(mo)}/mo in fees and interest — money that buys you nothing. Auto-pay and a small buffer usually eliminate these entirely.`,
+      save: mo });
+  }
+
+  // 7. Category over its own budget.
+  categoryTotals(monthTxs(key)).forEach(c=>{
+    const b=catBudget(c.name);
+    if (b>0 && c.amount>b*1.05) out.push({ id:'budget-'+c.name, icon:'🎯', kind:'budget',
+      title:`${c.name} is over budget`,
+      detail:`${money0(c.amount)} spent against a ${money0(b)} budget. Pulling back to plan saves ${money0(c.amount-b)}.`,
+      save: c.amount-b });
+  });
+
+  return out.filter(o=>o.save>2).sort((a,b)=>b.save-a.save);
+}
+function opportunities(){
+  const leaks=spendingLeaks();
+  const ai=(S.data.savings&&S.data.savings.items||[]).map((x,i)=>({
+    id:'ai-'+i, icon:'✦', kind:'swap', ai:true,
+    title:`${x.buy} → ${x.alt}`, detail:x.why, save:Number(x.save)||0,
+  }));
+  return ai.concat(leaks);
+}
+function potentialMonthly(){
+  const done=S.data.done||{};
+  const raw=opportunities().filter(o=>!done[o.id]).reduce((a,o)=>a+o.save,0);
+  const cancelled=recurring().filter(r=>r.cancelled).reduce((a,r)=>a+r.monthly,0);
+  // Keep the headline honest. Suggestions overlap in practice, so cap the
+  // claim at 40% of what you actually spend in a typical month — a number
+  // you could plausibly hit, rather than an arithmetic sum of best cases.
+  const months=[...new Set(S.data.txs.map(t=>monthKey(t.date)))];
+  const avgSpend = months.length
+    ? months.reduce((a,k)=>a+sumExpenses(monthTxs(k)),0)/months.length : 0;
+  const opps = avgSpend>0 ? Math.min(raw, avgSpend*0.4) : raw;
+  return { opps, cancelled, raw, capped: raw>opps, total:opps+cancelled };
+}
+function projection(key){
+  if (key!==curMonthKey()) return null;
+  const now=new Date(); const day=now.getDate();
+  const daysIn=new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const spent=sumExpenses(monthTxs(key));
+  if (day<=0) return null;
+  return { projected: spent/day*daysIn, perDay: spent/day, daysIn, day };
+}
+
+// ---- income, commitments & forecast -------------------------------------
+function incomeCats(){ return S.data.incomeCats || DEFAULT_INCOME_CATS; }
+function incomeCatBy(name){
+  return incomeCats().find(c=>c.name===name) || { name:name||'Other', color:'#5a5d78', icon:'•' };
+}
+function activeIncome(){ return (S.data.income||[]).filter(i=>i.active); }
+function plannedIncome(){ return activeIncome().reduce((a,i)=>a+perMonth(i.amount,i.cadence),0); }
+
+function activeRecur(){ return (S.data.recur||[]).filter(r=>r.active); }
+function manualRecurMonthly(){ return activeRecur().reduce((a,r)=>a+perMonth(r.amount,r.cadence),0); }
+
+// Auto-detected subscriptions the user hasn't cancelled and hasn't already
+// entered by hand (matched on normalized name, so we never count one twice).
+function autoRecurUncovered(){
+  const manual = new Set(activeRecur().map(r=>normMerchant(r.name)));
+  return subscriptions().filter(s=>!s.cancelled && !manual.has(normMerchant(s.name)));
+}
+function committedMonthly(){
+  const c=committedSplit(); return c.inHistory + c.extra;
+}
+/* Splitting commitments matters for the forecast.
+   Auto-detected subscriptions come FROM transactions, so they're already inside
+   observed spending. A hand-entered bill may or may not be — rent paid by
+   e-transfer from another account never shows up in an imported statement.
+   Only what's genuinely in the history can be netted off it; everything else is
+   real additional outflow. */
+function committedSplit(){
+  const seen=new Set(merchantStats().map(m=>m.key));
+  let inHistory=autoRecurUncovered().reduce((a,s)=>a+s.monthly,0);
+  let extra=0;
+  activeRecur().forEach(r=>{
+    const amt=perMonth(r.amount,r.cadence);
+    if (seen.has(normMerchant(r.name))) inHistory+=amt; else extra+=amt;
+  });
+  return { inHistory, extra };
+}
+
+// Average real monthly spend over recent complete-ish months.
+function avgMonthlySpend(n){
+  const keys=[...new Set(S.data.txs.map(t=>monthKey(t.date)))].sort().reverse().slice(0, n||3);
+  if (!keys.length) return 0;
+  return keys.reduce((a,k)=>a+sumExpenses(monthTxs(k)),0)/keys.length;
+}
+function avgMonthlyIncomeObserved(n){
+  const keys=[...new Set(S.data.txs.map(t=>monthKey(t.date)))].sort().reverse().slice(0, n||3);
+  if (!keys.length) return 0;
+  return keys.reduce((a,k)=>a+sumIncome(monthTxs(k)),0)/keys.length;
+}
+
+/* The forecast.
+   Outflow is split into commitments (known, contractual) and variable spend
+   (everything else, from history). Historical spending already contains the
+   subscription charges, so variable is measured as observed-minus-committed
+   rather than added on top — otherwise every bill would be counted twice. */
+function forecast(months){
+  const n = months || S.data.settings.forecastMonths || 12;
+  const split     = committedSplit();
+  const committed = split.inHistory + split.extra;
+  const observed  = avgMonthlySpend(3);
+  // Only net off the part of the commitments the history actually contains.
+  const variable  = Math.max(0, observed - split.inHistory);
+  const declared  = plannedIncome();
+  const observedIncome = avgMonthlyIncomeObserved(3);
+  const income = declared > 0 ? declared : observedIncome;
+
+  const outflow = committed + variable;
+  const net = income - outflow;
+  const start = Number(S.data.settings.startingBalance) || 0;
+
+  const points = [];
+  for (let m=0; m<=n; m++) points.push({ m, balance: start + net*m });
+
+  // If you're running a deficit, the only number that matters is how long
+  // the current balance lasts.
+  const runway = (net < 0 && start > 0) ? start / -net : null;
+
+  return {
+    income, declared, observedIncome, usingObserved: declared<=0 && observedIncome>0,
+    committed, variable, observed, outflow, net, start, points, n, runway,
+    rate: income>0 ? net/income*100 : null,
+    at: (m)=> start + net*m,
+  };
+}
+
+// ---- AI transport -------------------------------------------------------
+function hasKey(){ return !!S.apiKey; }
+async function llm({ system, messages, max_tokens }){
+  if (!S.apiKey) throw new Error('no-key');
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{
+      'content-type':'application/json',
+      'x-api-key':S.apiKey,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true',
+    },
+    body: JSON.stringify({ model:S.data.settings.model||'claude-haiku-4-5', max_tokens, system, messages }),
+  });
+  if (!r.ok){ const t=await r.text().catch(()=> ''); throw new Error('API '+r.status+' '+t.slice(0,140)); }
+  const j = await r.json();
+  return (j.content||[]).map(c=>c.text||'').join('').trim();
+}
+
+// ---- cheaper-alternative finder ----------------------------------------
+// Looks at what you buy *repeatedly* and proposes a cheaper like-for-like swap.
+function habitProfile(){
+  const ms=merchantStats().filter(m=>m.count>=2).slice(0,14);
+  const cats=categoryTotals(S.data.txs.filter(t=>monthKey(t.date)>=monthShiftKey(curMonthKey(),-2)));
+  const nM=Math.max(1,new Set(S.data.txs.map(t=>monthKey(t.date))).size);
+  return {
+    merchants: ms.map(m=>({ name:m.name, cat:m.cat||'Uncategorized', times:m.count,
+                            avg:+m.avg.toFixed(2), perMonth:+m.monthly.toFixed(2) })),
+    categoriesPerMonth: cats.map(c=>({ name:c.name, perMonth:+(c.amount/Math.min(3,nM)).toFixed(2) })),
+  };
+}
+async function findCheaper(){
+  if (S.ui.aiBusy) return;
+  const p=habitProfile();
+  if (!p.merchants.length){ toast('Add a few transactions first','err'); return; }
+  if (!hasKey()){
+    S.data.savings={ at:Date.now(), local:true, items:localAlternatives(p) };
+    save(); render(); toast('Suggestions ready (offline rules)','ok'); return;
+  }
+  S.ui.aiBusy=true; render();
+  const sys='You are a frugal-living analyst. Given a person\'s repeat purchases, propose concrete cheaper '
+    +'like-for-like substitutes they would plausibly accept — same need met, lower price. Be specific and realistic '
+    +'for a shopper in Canada. Never suggest simply "spend less" or "cancel everything". Estimate monthly savings '
+    +'conservatively from the numbers given. Return ONLY a JSON array, no prose or code fences, max 6 items: '
+    +'[{"buy":"what they buy now (short)","alt":"the cheaper swap (short)","why":"one sentence, concrete, mentions the trade-off","save":12.50}]. '
+    +'"save" is estimated monthly savings in '+cur()+' as a number.';
+  try {
+    const raw = await llm({ system:sys, max_tokens:900, messages:[{ role:'user',
+      content:'Currency '+cur()+'. My repeat purchases and monthly category spend:\n'+JSON.stringify(p,null,1)
+             +'\n\nGive me the cheaper swaps with the biggest realistic impact first.' }] });
+    const items=parseItems(raw)
+      .filter(x=>x&&x.buy&&x.alt)
+      .map(x=>({ buy:String(x.buy).slice(0,60), alt:String(x.alt).slice(0,60),
+                 why:String(x.why||'').slice(0,220), save:Math.max(0,Number(x.save)||0) }))
+      .slice(0,6);
+    if (!items.length) throw new Error('empty');
+    S.data.savings={ at:Date.now(), items }; save();
+    toast(items.length+' cheaper swaps found','ok');
+  } catch(err){
+    S.data.savings={ at:Date.now(), local:true, items:localAlternatives(p) }; save();
+    toast('Used built-in suggestions — '+(String(err.message).startsWith('API 401')?'API key rejected':'AI call failed'),'err');
+  }
+  S.ui.aiBusy=false; render();
+}
+// No key / no network: still give real, numbers-backed swaps.
+function localAlternatives(p){
+  const R=[
+    [/starbuck|coffee|cafe|café|tim horton|second cup/i, 'Brew at home + one café day a week', 'A bag of good beans runs about $18 and covers a month of mornings; keep the café for a weekly treat.', .65],
+    [/uber eats|doordash|skip|delivery/i, 'Pick up the same order yourself', 'Delivery fees, service fees and menu markups run 25–40% — the food is identical at the counter.', .35],
+    [/keg|restaurant|grill|sushi|steakhouse|bistro/i, 'Cook the same dish at home twice a month', 'A restaurant main is typically 3–4× its grocery cost; keep the outing, halve the frequency.', .35],
+    [/loblaws|metro|sobey|whole foods|farm boy/i, 'Switch the staples run to No Frills / FreshCo', 'Same brands, discount banner — typically 15–20% cheaper on an identical basket.', .18],
+    [/netflix|disney|crave|prime video|hulu|paramount/i, 'Drop to the ad-supported tier', 'Roughly 40% cheaper for the same catalogue; adverts are the only difference.', .40],
+    [/spotify|apple music|tidal|youtube premium/i, 'Move to a family/duo plan or annual billing', 'Splitting a family plan or paying yearly is usually 30–45% below a monthly solo plan.', .30],
+    [/petro|shell|esso|gas|fuel/i, 'Fill up at Costco/Canadian Tire with a fuel-rewards card', 'Discount stations plus a rewards card commonly save 8–12¢/L on the same fuel.', .10],
+    [/amazon|amzn/i, 'Wait 48h on anything non-essential', 'A short cooling-off period removes most impulse buys without changing what you actually need.', .25],
+    [/rogers|bell|telus|fido/i, 'Call retentions and re-price the plan', 'Existing customers who ask are routinely moved to current promo pricing — same service, one phone call.', .22],
+    [/cineplex|cinema|theatre/i, 'Tuesday screenings or a monthly pass', 'Discount days cut ticket prices roughly in half for the same film.', .45],
+    [/gym|fitness|goodlife/i, 'Move to a budget gym or off-peak membership', 'Basic memberships cover the same equipment for a fraction of a full-service club.', .40],
+  ];
+  const out=[];
+  (p.merchants||[]).forEach(m=>{
+    if (out.length>=6) return;
+    for (const [re,alt,why,pct] of R){
+      if (re.test(m.name)){
+        out.push({ buy:m.name+' ('+money0(m.perMonth)+'/mo)', alt, why, save:+(m.perMonth*pct).toFixed(2) });
+        break;
+      }
+    }
+  });
+  if (!out.length){
+    const top=(p.merchants||[])[0];
+    if (top) out.push({ buy:top.name, alt:'Set a monthly cap for this merchant',
+      why:'It is your most frequent repeat purchase at '+money0(top.perMonth)+'/mo — a cap is the simplest lever.',
+      save:+(top.perMonth*0.2).toFixed(2) });
+  }
+  return out;
+}
+
+// ---- image scan ---------------------------------------------------------
+function readFile(f){
+  return new Promise((res,rej)=>{
+    const r=new FileReader(); r.onload=()=>res(String(r.result)); r.onerror=()=>rej(new Error('read')); r.readAsDataURL(f);
+  });
+}
+async function scanFiles(files){
+  if (!hasKey()){
+    S.ui.screen='add'; S.ui.scan={ state:'error', pct:0, msg:'', file:'', error:'Reading screenshots needs your own Anthropic API key. Add it in Settings, or use "Add manually" / "Import CSV".', added:0, review:0 };
+    render(); return;
+  }
+  S.ui.screen='add';
+  S.ui.scan={ state:'processing', pct:5, msg:'Reading image…', file:files.length>1?files.length+' images':(files[0].name||'screenshot'), error:'', added:0, review:0 };
+  render(); animatePct();
+  const catList = catNames().join(', ');
+  const today = todayISO();
+  /* One prompt has to cover two very different images: a statement/screenshot
+     with many rows, and a photo of a single paper receipt. The rules below tell
+     the model which shape it's looking at and, critically, that a receipt is
+     ONE transaction at its grand total — not one per line item. */
+  const prompt =
+'You are reading a financial image for a personal spending tracker. It is ONE of:\n'+
+'  (A) a bank/credit-card statement or app screenshot listing MANY transactions, or\n'+
+'  (B) a photo or scan of a SINGLE paper/email receipt from one merchant.\n\n'+
+'Decide which, then extract accordingly.\n\n'+
+'IF (A) a statement: return one object per transaction row.\n'+
+'IF (B) a receipt: return EXACTLY ONE object for the whole receipt. Use the final grand\n'+
+'  total actually paid — the largest total AFTER taxes, tips and discounts (look for TOTAL,\n'+
+'  AMOUNT DUE, BALANCE, or the card-payment line). Do NOT return individual line items, and\n'+
+'  do NOT use the subtotal. Put the store name in "merchant". If you can read a tax line\n'+
+'  (GST/HST/PST/QST) put that number in "tax". Summarise notable items in "note" (max 8 words).\n\n'+
+'Rules for every object:\n'+
+'  "date": the transaction date as YYYY-MM-DD. Receipts often show DD/MM/YYYY or MM/DD/YYYY —\n'+
+'    if ambiguous, prefer DD/MM when the day is >12. If no year is printed, infer the most\n'+
+'    recent plausible year given today is '+today+'. If no date at all, use "'+today+'".\n'+
+'  "amount": a POSITIVE number, digits only (no currency symbol, no thousands separator).\n'+
+'  "currency": the ISO code actually printed on the image (CAD, USD, EUR...). Canadian\n'+
+'    receipts showing GST/HST/PST/QST or "$" with no other marking are CAD. If genuinely\n'+
+'    unknown use null — never guess a foreign currency.\n'+
+'  "type": "income" for deposits, refunds, credits, payroll, e-transfers received;\n'+
+'    "expense" for purchases, withdrawals, bills and fees.\n'+
+'  "category": the single best fit from exactly this list: '+catList+'. Use null only if\n'+
+'    genuinely unclear. Judge by what the merchant SELLS: a supermarket is Groceries even if\n'+
+'    the receipt includes household items; a restaurant, cafe, bar or food delivery is Dining;\n'+
+'    fuel, transit, rideshare and parking are Transport; streaming, apps and memberships are\n'+
+'    Subscriptions; utilities, phone, internet, insurance and rent are Bills.\n'+
+'  "tax": total sales tax as a number, or null.\n'+
+'  "note": "" unless a receipt gave you something useful.\n\n'+
+'Ignore anything that is not a real transaction: running balances, "available credit",\n'+
+'account totals, pending-authorisation duplicates, subtotals, and change given.\n\n'+
+'Return ONLY a JSON array. No prose, no explanation, no markdown code fences.\n'+
+'Example: [{"date":"2026-07-14","merchant":"Loblaws","amount":84.10,"currency":"CAD",'+
+'"type":"expense","category":"Groceries","tax":4.10,"note":""}]\n'+
+'If you cannot read any transaction at all, return [].';
+  const collected=[];
+  try {
+    for (const f of files){
+      const dataUrl = await readFile(f);
+      const b64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+      const raw = await llm({
+        max_tokens:1800,
+        messages:[{ role:'user', content:[
+          { type:'image', source:{ type:'base64', media_type:f.type||'image/png', data:b64 } },
+          { type:'text', text:prompt },
+        ]}],
+      });
+      parseItems(raw).forEach(x=>collected.push(x));
+    }
+    clearInterval(S._timer);
+    if (!collected.length){
+      S.ui.scan={ state:'error', pct:0, msg:'', file:'', error:"FireRaven couldn't find any transactions in that image. Make sure each row (date, merchant, amount) is clearly visible.", added:0, review:0 };
+      render(); return;
+    }
+    S.ui.scan.pct=100; render();
+    finishBatch(collected, 'scan');
+  } catch(err){
+    clearInterval(S._timer);
+    const msg=String(err&&err.message||err);
+    S.ui.scan={ state:'error', pct:0, msg:'', file:'', error:
+      msg.startsWith('API 401') ? 'Your API key was rejected. Check it in Settings.' :
+      msg.startsWith('API')     ? 'The AI service returned an error. Check your key and billing, then try again.' :
+      'Something went wrong reading that image. Try again.', added:0, review:0 };
+    render();
+  }
+}
+function animatePct(){
+  clearInterval(S._timer);
+  S._timer=setInterval(()=>{
+    const p=S.ui.scan.pct; if (p>=92) return;
+    const np=Math.min(92, p+Math.max(1,(94-p)*0.06));
+    S.ui.scan.pct=Math.round(np);
+    S.ui.scan.msg = np<40?'Reading image…':np<72?'Extracting transactions…':'Categorizing with FireRaven…';
+    const el=$('#scan-pct'); const bar=$('#scan-bar');
+    if (el) el.textContent=S.ui.scan.pct+'%'; if (bar) bar.style.width=S.ui.scan.pct+'%';
+    const msgel=$('#scan-msg'); if (msgel) msgel.textContent=S.ui.scan.msg;
+  },140);
+}
+function parseItems(raw){
+  if (!raw) return [];
+  let s=raw.trim().replace(/^```(json)?/i,'').replace(/```$/,'').trim();
+  const a=s.indexOf('['), b=s.lastIndexOf(']');
+  if (a===-1||b===-1) return [];
+  try { const arr=JSON.parse(s.slice(a,b+1)); return Array.isArray(arr)?arr:[]; } catch(e){ return []; }
+}
+// turn raw AI/CSV items into transactions, with merchant learning + dedup
+function finishBatch(items, source){
+  const existing = new Set(S.data.txs.map(t=>t.date+'|'+normMerchant(t.merchant)+'|'+t.amount.toFixed(2)));
+  let added=0, review=0, dupes=0;
+  const fresh=[];
+  items.forEach(x=>{
+    const amount=Math.abs(Number(x&&x.amount))||0;
+    if (amount<=0) return;
+    const merchant=String((x&&x.merchant)||'Unknown').slice(0,60);
+    const type=(x&&x.type)==='income'?'income':'expense';
+    const iso=parseLooseDate(x&&x.date);
+    const key=iso+'|'+normMerchant(merchant)+'|'+amount.toFixed(2);
+    if (existing.has(key)){ dupes++; return; }
+    existing.add(key);
+    let cat = x&&x.category;
+    if (cat && !catNames().includes(cat)) cat=null;
+    let needsReview=false;
+    if (type==='expense'){
+      if (!cat){ const g=guessCategory(merchant); cat=g.cat; needsReview=!g.learned; }
+    } else { cat=null; }
+    if (cat) learnMerchant(merchant, cat);
+
+    // Build the note from anything useful the scan gave us.
+    const bits=[];
+    if (x && x.note) bits.push(String(x.note).slice(0,60));
+    if (x && Number(x.tax)>0) bits.push('tax '+money(Number(x.tax)));
+    // A foreign-currency receipt would silently corrupt totals — flag, never convert.
+    const ccy = x && x.currency ? String(x.currency).toUpperCase().slice(0,3) : '';
+    if (ccy && ccy!==cur()){
+      bits.push('⚠ amount is in '+ccy+', not '+cur());
+      needsReview=true;
+    }
+    if (needsReview) review++;
+    added++;
+    fresh.push({ id:uid('b'), merchant, category:cat, amount, type, date:iso,
+                 note:bits.join(' · '), needsReview, source });
+  });
+  S.data.txs = fresh.concat(S.data.txs);
+  sortTxs();
+  save();
+  S.ui.scan={ state:'done', pct:100, msg:'', file:'', error:'', added, review, dupes };
+  render();
+}
+function sortTxs(){ S.data.txs.sort((a,b)=> a.date<b.date?1 : a.date>b.date?-1 : 0); }
+
+// ---- CSV ----------------------------------------------------------------
+function parseCSV(text){
+  const rows=[]; let row=[], cell='', q=false;
+  for (let i=0;i<text.length;i++){
+    const c=text[i];
+    if (q){
+      if (c==='"'){ if (text[i+1]==='"'){ cell+='"'; i++; } else q=false; }
+      else cell+=c;
+    } else {
+      if (c==='"') q=true;
+      else if (c===','){ row.push(cell); cell=''; }
+      else if (c==='\n'){ row.push(cell); rows.push(row); row=[]; cell=''; }
+      else if (c==='\r'){}
+      else cell+=c;
+    }
+  }
+  if (cell.length||row.length){ row.push(cell); rows.push(row); }
+  return rows.filter(r=>r.some(x=>String(x).trim()!==''));
+}
+function csvToItems(text){
+  const rows=parseCSV(text); if (!rows.length) return [];
+  const header=rows[0].map(h=>h.toLowerCase().trim());
+  const find=(...names)=>header.findIndex(h=>names.some(n=>h.includes(n)));
+  let di=find('date','posted','transaction date');
+  let mi=find('description','merchant','name','details','memo','payee');
+  let ai=find('amount','value');
+  const debit=find('debit','withdrawal','money out'), credit=find('credit','deposit','money in');
+  let hasHeader = di>=0 || mi>=0 || ai>=0 || debit>=0 || credit>=0;
+  const start = hasHeader ? 1 : 0;
+  if (!hasHeader){ di=0; mi=1; ai=2; } // best-effort positional
+  const items=[];
+  for (let i=start;i<rows.length;i++){
+    const r=rows[i]; if (!r.length) continue;
+    const dateRaw = di>=0 ? r[di] : r[0];
+    const merchant = mi>=0 ? r[mi] : (r[1]||'Unknown');
+    let amount=0, type='expense';
+    if (debit>=0 || credit>=0){
+      const d=parseFloat(String(r[debit]||'').replace(/[^0-9.\-]/g,''));
+      const c=parseFloat(String(r[credit]||'').replace(/[^0-9.\-]/g,''));
+      if (!isNaN(c)&&c>0){ amount=c; type='income'; }
+      else if (!isNaN(d)&&d>0){ amount=d; type='expense'; }
+    } else if (ai>=0){
+      const v=parseFloat(String(r[ai]).replace(/[^0-9.\-]/g,''));
+      if (!isNaN(v)){ amount=Math.abs(v); type=v>0?'income':'expense'; }
+    }
+    if (amount>0) items.push({ date:dateRaw, merchant:String(merchant||'Unknown').trim(), amount, type });
+  }
+  return items;
+}
+
+// ---- backup / restore ---------------------------------------------------
+function download(filename, text, mime){
+  const blob=new Blob([text],{ type:mime||'text/plain' });
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function exportJSON(){
+  download('fireraven-backup-'+todayISO()+'.json', JSON.stringify(S.data,null,2), 'application/json');
+  toast('Backup downloaded','ok');
+}
+function exportCSV(){
+  const rows=[['date','merchant','category','type','amount','note']];
+  S.data.txs.forEach(t=>rows.push([t.date, t.merchant, t.category||'', t.type, t.amount.toFixed(2), t.note||'']));
+  const csv=rows.map(r=>r.map(c=>{ c=String(c); return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c; }).join(',')).join('\n');
+  download('fireraven-transactions-'+todayISO()+'.csv', csv, 'text/csv');
+  toast('CSV exported','ok');
+}
+function restoreJSON(text){
+  try {
+    const d=JSON.parse(text);
+    if (!d || !Array.isArray(d.txs)) throw new Error('bad');
+    S.data=normalizeData(d); save(); render();
+    toast('Backup restored — '+S.data.txs.length+' transactions','ok');
+  } catch(e){ toast('That file could not be read as a FireRaven backup','err'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════════════════════════════════════
+function selMonth(){ return S.ui.month || curMonthKey(); }
+
+function render(){
+  if (S.locked){
+    $('#app').innerHTML = viewLock();
+    clearTimeout(S._lockTick);
+    if (lockoutLeft()>0) S._lockTick=setTimeout(render, 1000);   // live countdown
+    return;
+  }
+  const sc = S.data.onboarded ? S.ui.screen : 'onboarding';
+  let html='';
+  switch(sc){
+    case 'onboarding': html=viewOnboarding(); break;
+    case 'home':       html=viewHome(); break;
+    case 'activity':   html=viewActivity(); break;
+    case 'insights':   html=viewInsights(); break;
+    case 'save':       html=viewSave(); break;
+    case 'assistant':  html=viewAssistant(); break;
+    case 'review':     html=viewReview(); break;
+    case 'add':        html=viewAdd(); break;
+    case 'settings':   html=viewSettings(); break;
+    case 'categories': html=viewCategories(); break;
+    case 'incomecats': html=viewIncomeCats(); break;
+    default:           html=viewHome();
+  }
+  const showNav = ['home','activity','insights','save'].includes(sc);
+  html = '<div class="screen">'+html+'</div>';
+  if (showNav) html += navbar(sc);
+  if (S.ui.modal) html += modalView(S.ui.modal);
+  $('#app').innerHTML = html;
+  if (sc==='assistant'){ const p=$('#chat-scroll'); if (p) p.scrollTop=p.scrollHeight; }
+}
+
+// ---- lock screen --------------------------------------------------------
+function viewLock(){
+  const n=S.ui.pin.length;
+  const setting = S.ui.pinMode==='set';
+  const wait = setting ? 0 : lockoutLeft();
+  const title = !setting ? 'Enter your PIN'
+    : S.ui.pinStage===0 ? 'Choose a new 4-digit PIN' : 'Enter it once more';
+  const keys=[1,2,3,4,5,6,7,8,9];
+  return `<div class="lock">
+    <div style="position:relative;display:flex;align-items:center;justify-content:center;width:120px;height:120px">
+      <div class="glow" style="width:110px;height:110px"></div>
+      <div class="raven" style="width:88px;height:88px;position:relative"></div>
+    </div>
+    <div style="text-align:center">
+      <div style="font-size:19px;font-weight:600">${title}</div>
+      <div class="muted" style="font-size:12.5px;margin-top:5px">${setting?'You\'ll need this every time FireRaven opens.':'FireRaven is locked'}</div>
+    </div>
+    <div class="pin-dots ${S.ui.pinBad?'bad shake':''}">
+      ${[0,1,2,3].map(i=>`<i class="${i<n?'on':''}"></i>`).join('')}
+    </div>
+    <div class="pad" style="${wait?'opacity:.35;pointer-events:none':''}">
+      ${keys.map(k=>`<button data-act="pinKey" data-arg="${k}">${k}</button>`).join('')}
+      ${setting?`<button class="fn" data-act="pinCancel">Cancel</button>`:`<button class="blank"></button>`}
+      <button data-act="pinKey" data-arg="0">0</button>
+      <button class="fn" data-act="pinDel">⌫</button>
+    </div>
+    ${wait?`<div class="bad" style="font-size:12.5px;margin-top:-12px;text-align:center">Too many attempts — wait ${wait>60?Math.ceil(wait/60)+' min':wait+'s'}</div>`
+      :S.ui.pinBad?`<div class="bad" style="font-size:12.5px;margin-top:-12px">${setting?'Those didn\'t match — start again':'Wrong PIN'}</div>`:''}
+  </div>`;
+}
+
+// ---- navbar -------------------------------------------------------------
+function navbar(sc){
+  const item=(key,label,svg)=>`<button class="nav-i ${sc===key?'on':''}" data-act="go" data-arg="${key}">${svg}${label}</button>`;
+  return `<div class="navbar">
+    ${item('home','Home','<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>')}
+    ${item('activity','Activity','<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M4 12h16M4 18h10"/></svg>')}
+    <button class="fab" data-act="openAdd"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
+    ${item('insights','Insights','<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19V10M10 19V5M16 19v-7M22 19H2"/></svg>')}
+    ${item('save','Save','<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2v20M17 5.5c0-1.9-2.2-2.5-5-2.5s-5 .8-5 3 2.4 2.7 5 3.2 5 1.1 5 3.3-2.2 3-5 3-5-.8-5-2.8"/></svg>')}
+  </div>`;
+}
+
+// ---- onboarding ---------------------------------------------------------
+function viewOnboarding(){
+  const step=S.ui.obStep;
+  const slides=[
+    { art:`<div class="raven" style="width:140px;height:140px;animation:bob 3s ease-in-out infinite"></div>`,
+      title:'Meet FireRaven', body:'Your pet raven who reads your spending and sorts it for you. No accounts, no servers — everything stays on your device.' },
+    { art:`<div style="width:100px;height:100px;border-radius:20px;background:var(--surface);display:flex;flex-direction:column;gap:7px;padding:16px 14px;justify-content:center;position:relative">
+        <div style="height:8px;width:70%;border-radius:3px;background:var(--accent-soft)"></div>
+        <div style="height:8px;width:90%;border-radius:3px;background:var(--accent)"></div>
+        <div style="height:8px;width:55%;border-radius:3px;background:var(--accent-soft)"></div>
+        <div style="position:absolute;right:-8px;bottom:-8px;width:34px;height:34px;border-radius:11px;background:var(--accent);display:flex;align-items:center;justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#161826" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg></div></div>`,
+      title:'Snap it, import it, log it', body:'Upload a bank screenshot, import a CSV, or add a purchase by hand. FireRaven reads the date, merchant and amount and files each one.' },
+    { art:`<div style="display:flex;align-items:flex-end;gap:8px;height:90px">
+        <div style="width:16px;height:38px;border-radius:4px;background:var(--accent-soft)"></div>
+        <div style="width:16px;height:60px;border-radius:4px;background:#6c63a6"></div>
+        <div style="width:16px;height:48px;border-radius:4px;background:var(--accent-soft)"></div>
+        <div style="width:16px;height:82px;border-radius:4px;background:var(--accent)"></div></div>`,
+      title:'Spot patterns, save money', body:'Real month-by-month trends, per-category budgets, and recurring-subscription tracking — plus data-driven ways to spend less.' },
+  ];
+  const s=slides[step];
+  return `<div class="page nonav" style="justify-content:space-between;padding-top:calc(26px + var(--safe-top))">
+    <div class="between"><span></span><button class="link" data-act="obSkip" style="color:var(--muted)">Skip</button></div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:24px">
+      <div style="position:relative;display:flex;align-items:center;justify-content:center;width:170px;height:170px">
+        <div class="glow" style="width:150px;height:150px"></div>${s.art}
+      </div>
+      <div style="max-width:300px">
+        <h2 style="font-size:27px;margin-bottom:10px">${s.title}</h2>
+        <p class="muted" style="font-size:15px;line-height:1.55">${s.body}</p>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:18px;align-items:center">
+      <div class="dots">${[0,1,2].map(i=>`<span class="${i===step?'on':''}"></span>`).join('')}</div>
+      <button class="btn btn-primary btn-block" data-act="obNext" style="font-size:15px;padding:13px">${step>=2?'Get started':'Continue'}</button>
+    </div>
+  </div>`;
+}
+
+// ---- home ---------------------------------------------------------------
+function viewHome(){
+  const key=selMonth();
+  const list=monthTxs(key);
+  const spent=sumExpenses(list), income=sumIncome(list);
+  const budget=S.data.settings.monthlyBudget;
+  const prevSpent=sumExpenses(monthTxs(monthShiftKey(key,-1)));
+  const catList=categoryTotals(list);
+  const reviewN=S.data.txs.filter(t=>t.needsReview).length;
+  const sts=safeToSpend(key);
+  const pot=potentialMonthly();
+  const hr=new Date().getHours();
+  const greeting=hr<12?'Good morning':hr<18?'Good afternoon':'Good evening';
+  const isCur=key===curMonthKey();
+
+  let vs='';
+  if (prevSpent>0){
+    const pct=Math.round((spent-prevSpent)/prevSpent*100);
+    vs=`<span class="${pct>0?'bad':'good'}">${pct>=0?'+':''}${pct}%</span> vs ${MON_SHORT[(+monthShiftKey(key,-1).split('-')[1])-1]}`;
+  } else vs='<span class="muted">no prior month</span>';
+
+  const budgetPct=budget>0?Math.round(spent/budget*100):0;
+  const over=spent>budget;
+  const bcolor=over?'var(--bad)':budgetPct>85?'var(--warn)':'var(--good)';
+
+  return `<div class="page">
+    <div class="row">
+      <div class="raven" style="width:42px;height:42px"></div>
+      <div class="grow"><div style="font-size:11px" class="muted">${greeting}</div><div style="font-size:16px;font-weight:600">Here's your money, Wes</div></div>
+      <button class="icon-btn" data-act="go" data-arg="assistant" title="Ask FireRaven"><div class="raven" style="width:21px;height:19px"></div></button>
+      <button class="icon-btn" data-act="go" data-arg="review" style="position:relative"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg>${reviewN?`<span style="position:absolute;top:-2px;right:-2px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--accent);color:#161826;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)">${reviewN}</span>`:''}</button>
+      <button class="icon-btn" data-act="go" data-arg="settings"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.3l2-1.6-2-3.4-2.4 1a7 7 0 00-2.2-1.3L13.9 2h-3.8l-.4 2.4a7 7 0 00-2.2 1.3l-2.4-1-2 3.4 2 1.6A7 7 0 005 12a7 7 0 00.1 1.3l-2 1.6 2 3.4 2.4-1a7 7 0 002.2 1.3l.4 2.4h3.8l.4-2.4a7 7 0 002.2-1.3l2.4 1 2-3.4-2-1.6c.06-.43.1-.86.1-1.3z"/></svg></button>
+    </div>
+
+    ${monthSwitcher(key)}
+
+    <div class="hero hero-spend">
+      <div>
+        <div class="kpi">${money(spent)}</div>
+        <div style="font-size:12px;margin-top:2px" class="muted">spent this month · ${vs}${income>0?` · <span class="income">${money(income)} in</span>`:''}</div>
+      </div>
+      ${budget>0?`
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <div class="bar" style="background:rgba(0,0,0,.28)"><span style="width:${Math.min(100,budgetPct)}%;background:${bcolor}"></span></div>
+        <div class="between" style="font-size:11.5px"><span style="color:${bcolor};font-weight:600">${over?money0(spent-budget)+' over budget':money0(budget-spent)+' left'}</span><span class="muted">${budgetPct}% of ${money0(budget)}</span></div>
+      </div>`:''}
+      ${sts?`<hr class="rule" style="background:rgba(255,255,255,.09)">
+      <div class="row" style="gap:11px">
+        <div class="tx-ic" style="width:34px;height:34px;border-radius:10px;background:rgba(0,0,0,.28);color:var(--accent-2);font-size:15px">◷</div>
+        <div class="grow">
+          <div style="font-size:15px;font-weight:650;color:${sts.over?'var(--bad)':'var(--good)'}">${sts.over?money0(Math.abs(sts.remaining))+' over plan':money(sts.perDay)+' a day'}</div>
+          <div class="tx-sub">${sts.over?'you\'ve passed the monthly budget':'safe to spend for the '+sts.daysLeft+' day'+(sts.daysLeft===1?'':'s')+' left'}</div>
+        </div>
+      </div>`:''}
+    </div>
+
+    ${pot.total>3?`<button class="card card-tight" data-act="go" data-arg="save" style="flex-direction:row;align-items:center;gap:12px;text-align:left;box-shadow:inset 0 0 0 1px rgba(232,192,122,.22)">
+      <div class="opp-ic">✦</div>
+      <div class="grow"><div style="font-size:13.5px;font-weight:650">${money0(pot.total)}/mo in savings found</div>
+        <div class="tx-sub">about ${money0(pot.total*12)} a year — see how</div></div>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--save)" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+    </button>`:''}
+
+    ${catList.length?`<div class="card" style="flex-direction:row;align-items:center;gap:16px">
+      ${donut(catList, spent)}
+      <div class="grow" style="display:flex;flex-direction:column;gap:9px">
+        ${catList.slice(0,5).map(c=>`<div style="display:flex;align-items:center;gap:8px;font-size:13px"><span class="swatch" style="background:${c.color}"></span>${esc(c.name)}<span style="margin-left:auto" class="muted">${money(c.amount)}</span></div>`).join('')}
+      </div>
+    </div>`:''}
+
+    <div class="between">
+      <div style="font-size:15px;font-weight:600">Recent activity</div>
+      <button class="link" data-act="go" data-arg="activity">See all</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      ${list.length ? list.slice(0,6).map(txRow).join('')
+        : `<p class="muted" style="font-size:13px">No transactions in ${monthLabel(key)}. Tap ＋ to add one, or ${isCur?'':'switch months, or '}load sample data in Settings.</p>`}
+    </div>
+  </div>`;
+}
+function monthSwitcher(key){
+  const atCurrent = key===curMonthKey();
+  return `<div class="between" style="margin-top:-2px">
+    <button class="icon-btn" data-act="monthPrev" style="width:32px;height:32px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg></button>
+    <div class="section-label">${monthLabel(key)}</div>
+    <button class="icon-btn" data-act="monthNext" style="width:32px;height:32px;${atCurrent?'opacity:.35;pointer-events:none':''}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>
+  </div>`;
+}
+function donut(catList, total){
+  const sum=catList.reduce((a,c)=>a+c.amount,0)||1;
+  let cum=0;
+  const segs=catList.map(c=>{
+    const p=c.amount/sum*100;
+    const seg=`<circle cx="21" cy="21" r="15.9" fill="none" stroke="${c.color}" stroke-width="6" stroke-dasharray="${p.toFixed(1)} ${(100-p).toFixed(1)}" stroke-dashoffset="${(25-cum).toFixed(1)}" stroke-linecap="round"/>`;
+    cum+=p; return seg;
+  }).join('');
+  return `<svg class="donut" width="108" height="108" viewBox="0 0 42 42" style="flex:none">
+    <circle cx="21" cy="21" r="15.9" fill="none" stroke="#2a2c3a" stroke-width="6"/>
+    ${segs}
+    <text x="21" y="20" text-anchor="middle" font-size="6" font-weight="700">${catList.length}</text>
+    <text x="21" y="25.5" text-anchor="middle" font-size="2.6" fill="#8b8ea3">categories</text>
+  </svg>`;
+}
+function txRow(t){
+  const c=catBy(t.category);
+  const income=t.type==='income';
+  const sign=income?'+':'−';
+  const acolor=income?'var(--income)':'var(--text)';
+  return `<div class="tx" data-act="editTx" data-arg="${t.id}">
+    <div class="tx-ic" style="${income?'color:var(--income)':''}">${income?'↩︎':esc(c.icon)}</div>
+    <div class="grow">
+      <div class="nowrap" style="font-size:14px;display:flex;align-items:center;gap:6px">${esc(t.merchant)}
+        ${t.needsReview?'<span class="tag tag-review">Review</span>':''}
+        ${t.source==='scan'||t.source==='import'?'<span class="tag tag-new">New</span>':''}</div>
+      <div class="tx-sub">${income?'Income':esc(t.category||'Uncategorized')} · ${fmtDate(t.date)}${t.note?' · '+esc(t.note):''}</div>
+    </div>
+    <div class="tx-amt" style="color:${acolor}">${sign}${money(t.amount)}</div>
+  </div>`;
+}
+
+// ---- activity -----------------------------------------------------------
+function viewActivity(){
+  const key=selMonth();
+  let list=monthTxs(key);
+  const q=S.ui.search.trim().toLowerCase();
+  const fc=S.ui.filterCat;
+  if (fc!=='All') list = fc==='Income' ? list.filter(t=>t.type==='income') : list.filter(t=>t.category===fc);
+  if (q) list=list.filter(t=>t.merchant.toLowerCase().includes(q)||(t.note||'').toLowerCase().includes(q)||(t.category||'').toLowerCase().includes(q));
+  const spent=sumExpenses(list);
+  const reviewN=S.data.txs.filter(t=>t.needsReview).length;
+
+  const filterChips=['All','Income',...catNames()].map(c=>`<button class="chip ${fc===c?'chip-on':''}" data-act="filterCat" data-arg="${esc(c)}" style="flex:none">${esc(c)}</button>`).join('');
+
+  // group by date
+  const groups={}; list.forEach(t=>{ (groups[t.date]=groups[t.date]||[]).push(t); });
+  const dates=Object.keys(groups).sort().reverse();
+
+  return `<div class="page">
+    <div class="h-title">Activity</div>
+    ${reviewN?`<button class="card card-tight" data-act="go" data-arg="review" style="flex-direction:row;align-items:center;gap:11px;text-align:left;background:var(--accent-900);box-shadow:inset 0 0 0 1px var(--accent-800)">
+      <div class="raven" style="width:32px;height:32px"></div>
+      <div class="grow"><b style="font-size:13px">${reviewN} to review</b><div class="warn" style="font-size:11px">FireRaven needs a category for these</div></div>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-2)" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+    </button>`:''}
+    ${monthSwitcher(key)}
+    <div class="field">
+      <input class="input" id="act-search" data-field="search" placeholder="Search merchant, note or category" value="${esc(S.ui.search)}">
+    </div>
+    <div class="chips" style="flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px">${filterChips}</div>
+    <div class="between"><div class="section-label">${list.length} transaction${list.length===1?'':'s'}</div><div class="section-label">${money(spent)}</div></div>
+    <div id="act-list" style="display:flex;flex-direction:column;gap:10px">
+      ${dates.length ? dates.map(d=>`<div><div class="tx-sub" style="margin:2px 6px 4px;font-weight:600">${fmtDate(d)}</div>${groups[d].map(txRow).join('')}</div>`).join('')
+        : `<p class="muted" style="font-size:13px;margin-top:6px">Nothing matches. ${q||fc!=='All'?'Try clearing the search or filter.':'Add transactions with the ＋ button.'}</p>`}
+    </div>
+  </div>`;
+}
+
+// ---- insights -----------------------------------------------------------
+function viewInsights(){
+  const key=selMonth();
+  const list=monthTxs(key);
+  const spent=sumExpenses(list);
+  const t6=trend(6);
+  const tmax=Math.max(...t6.map(x=>x.value),1);
+  const avg=t6.reduce((a,x)=>a+x.value,0)/t6.length;
+  const catList=categoryTotals(list);
+  const catSum=catList.reduce((a,c)=>a+c.amount,0)||1;
+  const budget=S.data.settings.monthlyBudget;
+  const proj=projection(key);
+  const rec=recurring();
+  const recTotal=rec.reduce((a,r)=>a+r.monthly,0);
+
+  // top merchants this month
+  const byM={}; list.filter(t=>t.type!=='income').forEach(t=>byM[t.merchant]=(byM[t.merchant]||0)+t.amount);
+  const topM=Object.keys(byM).map(n=>({ n, v:byM[n] })).sort((a,b)=>b.v-a.v).slice(0,4);
+  const biggest=list.filter(t=>t.type!=='income').slice().sort((a,b)=>b.amount-a.amount)[0];
+
+  const tips=buildTips(list, catList, rec);
+  const cf=cashflow(key);
+  const exp=list.filter(t=>t.type!=='income');
+  const nTx=exp.length;
+  const avgTx=nTx?spent/nTx:0;
+  const dow=dowTotals(list);
+  const dowMax=Math.max(...dow.map(d=>d.total),1);
+  const busiest=dow.slice().sort((a,b)=>b.total-a.total)[0];
+  const daily=dailyTotals(key);
+  const dMax=Math.max(...daily,1);
+  const isCurM=key===curMonthKey();
+  const today=new Date().getDate();
+  const deltas=catDeltas(key).filter(d=>Math.abs(d.delta)>1).slice(0,5);
+  const noSpend=daily.filter((v,i)=>v===0 && (!isCurM || i<today)).length;
+  const pot=potentialMonthly();
+
+  return `<div class="page">
+    <div class="row"><div class="h-title grow">Insights</div>
+      <button class="icon-btn" data-act="go" data-arg="assistant" title="Ask FireRaven"><div class="raven" style="width:21px;height:19px"></div></button></div>
+    ${monthSwitcher(key)}
+
+    <div class="stats">
+      <div class="stat"><span>Spent</span><b>${money0(spent)}</b><small>${nTx} purchase${nTx===1?'':'s'}</small></div>
+      <div class="stat"><span>Income</span><b class="${cf.income>0?'income':''}">${money0(cf.income)}</b><small>${cf.rate!=null?Math.round(cf.rate)+'% kept':'none logged'}</small></div>
+      <div class="stat"><span>Net</span><b class="${cf.net>=0?'good':'bad'}">${cf.net>=0?'+':'−'}${money0(Math.abs(cf.net))}</b><small>${cf.net>=0?'saved this month':'more out than in'}</small></div>
+      <div class="stat"><span>Avg purchase</span><b>${money0(avgTx)}</b><small>${noSpend} no-spend day${noSpend===1?'':'s'}</small></div>
+    </div>
+
+    ${cf.income>0?`<div class="card card-tight">
+      <div class="between"><div style="font-size:13px;font-weight:600">Cash flow</div>
+        <div class="delta ${cf.net>=0?'down':'up'}">${cf.rate!=null?(cf.rate>=0?'saving ':'overspending ')+Math.abs(Math.round(cf.rate))+'%':''}</div></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div><div class="between" style="font-size:11.5px;margin-bottom:4px"><span class="muted">In</span><span class="income">${money(cf.income)}</span></div>
+          <div class="bar"><span style="width:100%;background:var(--income)"></span></div></div>
+        <div><div class="between" style="font-size:11.5px;margin-bottom:4px"><span class="muted">Out</span><span>${money(cf.spent)}</span></div>
+          <div class="bar"><span style="width:${Math.min(100,cf.income?cf.spent/cf.income*100:100).toFixed(0)}%;background:var(--accent)"></span></div></div>
+      </div>
+      <div class="tx-sub">${cf.net>=0?`You kept ${money0(cf.net)} of what came in.`:`You spent ${money0(-cf.net)} more than you earned this month.`}</div>
+    </div>`:''}
+
+    <div class="card">
+      <div class="between"><div style="font-size:13px;font-weight:600">6-month trend</div><div style="font-size:12px" class="muted">avg ${money0(avg)}</div></div>
+      <div style="display:flex;align-items:flex-end;gap:10px;height:104px">
+        ${t6.map(b=>{ const on=b.key===curMonthKey(); return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;justify-content:flex-end">
+          <div style="width:60%;height:${Math.max(6,b.value/tmax*90).toFixed(0)}px;border-radius:4px;background:${on?'var(--accent)':'var(--accent-soft)'}"></div>
+          <span style="font-size:9px;color:${on?'var(--text)':'var(--muted)'}">${b.label}</span></div>`; }).join('')}
+      </div>
+    </div>
+
+    ${proj?`<div class="card card-tight">
+      <div class="row"><div class="tx-ic" style="color:var(--accent-2)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18M7 14l4-4 3 3 5-6"/></svg></div>
+      <div class="grow"><div style="font-size:13px;font-weight:600">On track for ${money0(proj.projected)}</div><div class="tx-sub">at ${money0(proj.perDay)}/day · day ${proj.day} of ${proj.daysIn}${budget>0?' · budget '+money0(budget):''}</div></div></div>
+    </div>`:''}
+
+    ${spent>0?`<div class="card card-tight">
+      <div class="between"><div style="font-size:13px;font-weight:600">Day by day</div><div style="font-size:12px" class="muted">peak ${money0(dMax)}</div></div>
+      <div class="spark">${daily.map((v,i)=>`<i class="${isCurM&&i===today-1?'today':''}" style="height:${Math.max(2,v/dMax*44).toFixed(0)}px" title="${i+1}: ${money0(v)}"></i>`).join('')}</div>
+      <div class="between tx-sub"><span>1</span><span>${daily.length}</span></div>
+    </div>
+
+    <div class="card card-tight">
+      <div class="between"><div style="font-size:13px;font-weight:600">Which days cost you</div><div style="font-size:12px" class="muted">${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dow.indexOf(busiest)]} is worst</div></div>
+      <div class="dow">${dow.map(d=>`<div class="dow-b"><i class="${d===busiest?'hi':''}" style="height:${Math.max(3,d.total/dowMax*58).toFixed(0)}px"></i><span>${d.label}</span></div>`).join('')}</div>
+      <div class="tx-sub">${money0(busiest.total)} across ${busiest.count} purchase${busiest.count===1?'':'s'} on that day.</div>
+    </div>`:''}
+
+    ${deltas.length?`<div class="card card-tight">
+      <div style="font-size:13px;font-weight:600">Versus last month</div>
+      ${deltas.map(d=>`<div class="row" style="gap:9px;font-size:13px">
+        <span class="swatch" style="background:${d.color}"></span>
+        <span class="grow nowrap">${esc(d.name)}</span>
+        <span class="muted" style="font-size:12px">${money0(d.prev)} → ${money0(d.now)}</span>
+        <span class="delta ${d.delta>0?'up':d.delta<0?'down':'flat'}">${d.delta>0?'▲':'▼'} ${money0(Math.abs(d.delta))}</span>
+      </div>`).join('')}
+    </div>`:''}
+
+    ${catList.length?`<div style="font-size:15px;font-weight:600;margin-top:2px">Where it goes</div>
+    <div style="display:flex;flex-direction:column;gap:13px">
+      ${catList.map(c=>`<div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;font-size:13px"><span class="swatch" style="background:${c.color};margin-right:8px"></span>${esc(c.icon)} ${esc(c.name)}<span style="margin-left:auto" class="muted">${money(c.amount)} · ${Math.round(c.amount/catSum*100)}%</span></div>
+        <div class="bar"><span style="width:${Math.max(5,c.amount/catList[0].amount*100).toFixed(0)}%;background:${c.color}"></span></div>
+        ${catBudget(c.name)>0?`<div class="tx-sub" style="text-align:right;color:${c.amount>catBudget(c.name)?'var(--bad)':'var(--muted)'}">${money0(c.amount)} / ${money0(catBudget(c.name))} budget</div>`:''}
+      </div>`).join('')}
+    </div>`:''}
+
+    ${topM.length?`<div class="card card-tight">
+      <div style="font-size:13px;font-weight:600">Top merchants</div>
+      ${topM.map(m=>`<div class="between" style="font-size:13px"><span class="nowrap">${esc(m.n)}</span><span class="muted">${money(m.v)}</span></div>`).join('')}
+      ${biggest?`<hr class="rule"><div class="tx-sub">Biggest single purchase: <b>${esc(biggest.merchant)}</b> — ${money(biggest.amount)}</div>`:''}
+    </div>`:''}
+
+    ${rec.length?`<div class="card card-tight">
+      <div class="between"><div style="font-size:13px;font-weight:600">Recurring & subscriptions</div><span class="tag tag-recur">${money0(recTotal)}/mo</span></div>
+      ${rec.slice(0,6).map(r=>`<div class="between" style="font-size:13px"><span class="nowrap">${esc(r.name)}</span><span class="muted">${money(r.monthly)}/mo · ${money0(r.annual)}/yr</span></div>`).join('')}
+      <div class="tx-sub">About ${money0(rec.reduce((a,r)=>a+r.annual,0))} a year across ${rec.length} recurring charge${rec.length===1?'':'s'}.</div>
+    </div>`:''}
+
+    <div class="sec"><div class="sec-ic">✦</div><h3>FireRaven's read</h3></div>
+    <div style="display:flex;flex-direction:column;gap:11px">
+      ${tips.map(text=>`<div class="card card-tight" style="flex-direction:row;gap:12px;align-items:flex-start">
+        <div class="tx-ic" style="width:30px;height:30px;border-radius:9px;background:var(--accent-900);color:var(--accent-2);font-size:15px">✦</div>
+        <div style="font-size:13px;line-height:1.5">${text}</div></div>`).join('')}
+      ${pot.total>3?`<button class="btn btn-ghost btn-block" data-act="go" data-arg="save" style="box-shadow:inset 0 0 0 1px rgba(232,192,122,.28);color:var(--save)">See ${money0(pot.total)}/mo of savings ideas →</button>`:''}
+    </div>
+  </div>`;
+}
+function catBudget(name){ const c=cats().find(x=>x.name===name); return c&&c.budget?c.budget:0; }
+function buildTips(list, catList, rec){
+  const tips=[];
+  const subs=rec.filter(r=>r.cat==='Subscriptions');
+  if (subs.length){ const yr=subs.reduce((a,r)=>a+r.annual,0); tips.push(`Your ${subs.length} subscription${subs.length>1?'s':''} cost about ${money0(subs.reduce((a,r)=>a+r.monthly,0))}/mo — roughly <b>${money0(yr)} a year</b>. Cancelling one you rarely use is the easiest cut.`); }
+  const dining=catList.find(c=>c.name==='Dining');
+  if (dining){ const n=list.filter(t=>t.category==='Dining').length; tips.push(`${n} dining purchase${n===1?'':'s'} added up to ${money(dining.amount)} this month. Cooking a couple at home would save around <b>${money0(dining.amount*0.3)}</b>.`); }
+  const byM={}; list.filter(t=>t.type!=='income').forEach(t=>byM[t.merchant]=(byM[t.merchant]||0)+t.amount);
+  const top=Object.keys(byM).sort((a,b)=>byM[b]-byM[a])[0];
+  if (top){ tips.push(`${esc(top)} is your single largest spend at <b>${money(byM[top])}</b>. Worth a check that it was planned.`); }
+  if (!tips.length) tips.push("Add a few transactions and I'll find specific ways to save from your real spending.");
+  return tips.slice(0,3);
+}
+
+// ---- save money hub -----------------------------------------------------
+function viewSave(){
+  const tab=S.ui.saveTab;
+  const f=forecast();
+  const seg=(k,l)=>`<button class="${tab===k?'on':''}" data-act="saveTab" data-arg="${k}">${l}</button>`;
+
+  return `<div class="page">
+    <div class="row">
+      <div class="h-title grow">Plan</div>
+      <button class="icon-btn" data-act="go" data-arg="assistant" title="Ask FireRaven"><div class="raven" style="width:21px;height:19px"></div></button>
+    </div>
+
+    <div class="hero ${f.net>=0?'hero-save':'hero-spend'}">
+      <div>
+        <div class="section-label" style="color:${f.net>=0?'var(--save)':'var(--bad)'}">${f.net>=0?'Keeping each month':'Short each month'}</div>
+        <div class="kpi" style="margin-top:4px">${f.net>=0?'':'−'}${money0(Math.abs(f.net))}<span style="font-size:16px;font-weight:600;color:var(--muted)">/mo</span></div>
+        <div style="font-size:12.5px;margin-top:3px" class="muted">
+          ${f.income>0
+            ? `${money0(f.income)} in · ${money0(f.outflow)} out${f.rate!=null?` · ${Math.round(f.rate)}% kept`:''}`
+            : 'add your income to see the full picture'}
+        </div>
+      </div>
+    </div>
+
+    <div class="seg">${seg('forecast','Forecast')}${seg('income','Income')}${seg('subs','Recurring')}${seg('ideas','Save')}</div>
+
+    ${tab==='forecast'?planForecast(f):tab==='income'?planIncome():tab==='subs'?saveSubs():planSave()}
+  </div>`;
+}
+
+// ── Forecast ─────────────────────────────────────────────────────────────
+function planForecast(f){
+  const st=S.data.settings;
+  const goal=st.savingsGoal||0;
+  if (f.income<=0 && f.outflow<=0) return `<div class="card"><div class="muted" style="font-size:13px;line-height:1.55">
+    FireRaven needs two things to forecast: what comes in, and what goes out. Add your income under the <b>Income</b> tab, and import a month or two of spending — the projection appears here automatically.</div>
+    <button class="btn btn-primary btn-block" data-act="saveTab" data-arg="income">Add my income</button></div>`;
+
+  const n=f.n;
+  const vals=f.points.map(p=>p.balance);
+  const lo=Math.min(...vals,0), hi=Math.max(...vals,0);
+  const span=(hi-lo)||1;
+  const H=104;
+  const pts=f.points.map((p,i)=>`${(i/(n)*100).toFixed(2)},${(H-((p.balance-lo)/span*H)).toFixed(2)}`).join(' ');
+  const zeroY=(H-((0-lo)/span*H)).toFixed(2);
+  const milestone=(m)=>`<div class="stat"><span>In ${m} month${m===1?'':'s'}</span><b class="${f.at(m)>=0?'':'bad'}">${f.at(m)<0?'−':''}${money0(Math.abs(f.at(m)))}</b><small>${fmtFuture(m)}</small></div>`;
+
+  return `
+    <div class="card">
+      <div class="between"><div style="font-size:13px;font-weight:600">Projected balance</div>
+        <div class="muted" style="font-size:12px">next ${n} months</div></div>
+      <svg viewBox="0 0 100 ${H}" preserveAspectRatio="none" style="width:100%;height:118px;overflow:visible">
+        <defs><linearGradient id="fgrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${f.net>=0?'#e8c07a':'#f0a6a6'}" stop-opacity=".32"/>
+          <stop offset="100%" stop-color="${f.net>=0?'#e8c07a':'#f0a6a6'}" stop-opacity="0"/>
+        </linearGradient></defs>
+        ${lo<0?`<line x1="0" y1="${zeroY}" x2="100" y2="${zeroY}" stroke="#f0a6a6" stroke-width=".5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke"/>`:''}
+        <polygon points="0,${H} ${pts} 100,${H}" fill="url(#fgrad)"/>
+        <polyline points="${pts}" fill="none" stroke="${f.net>=0?'#e8c07a':'#f0a6a6'}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
+      </svg>
+      <div class="between tx-sub"><span>now · ${money0(f.start)}</span><span>${fmtFuture(n)} · ${money0(f.at(n))}</span></div>
+    </div>
+
+    <div class="stats">${milestone(3)}${milestone(6)}${milestone(12)}
+      <div class="stat"><span>Savings rate</span><b class="${f.net>=0?'good':'bad'}">${f.rate!=null?Math.round(f.rate)+'%':'—'}</b><small>of income kept</small></div>
+    </div>
+
+    ${f.runway!=null?`<div class="opp" style="box-shadow:inset 0 0 0 1px rgba(240,166,166,.3)">
+      <div class="opp-ic" style="background:#2b2028;color:var(--bad)">⚠</div>
+      <div class="grow"><div style="font-size:13.5px;font-weight:650">About ${f.runway.toFixed(1)} months of runway</div>
+        <div class="tx-sub">At ${money0(-f.net)}/mo short, your ${money0(f.start)} balance runs out around ${fmtFuture(Math.floor(f.runway))}. Cutting ${money0(-f.net)}/mo breaks even.</div></div>
+    </div>`:''}
+
+    ${goal>0&&f.net>0?`<div class="opp"><div class="opp-ic">🎯</div><div class="grow">
+      <div style="font-size:13.5px;font-weight:650">${f.net>=goal?'You\'re beating your goal':`${money0(goal-f.net)}/mo short of your goal`}</div>
+      <div class="tx-sub">Goal is ${money0(goal)}/mo; you're on track for ${money0(f.net)}/mo. ${f.net>=goal?`That's ${money0(f.net*12)} a year.`:`The Save tab has ${money0(potentialMonthly().total)}/mo of ideas.`}</div></div></div>`:''}
+
+    <div class="card card-tight">
+      <div style="font-size:13px;font-weight:600">How this is built</div>
+      ${fRow('Income', f.income, f.usingObserved?'averaged from your transactions':'from your Income tab', 'income')}
+      <hr class="rule">
+      ${fRow('Commitments', -f.committed, 'subscriptions & recurring bills', 'bad')}
+      <hr class="rule">
+      ${fRow('Everyday spending', -f.variable, 'average of your last 3 months, minus commitments', 'bad')}
+      <hr class="rule">
+      ${fRow(f.net>=0?'Left over':'Shortfall', f.net, 'each month', f.net>=0?'good':'bad')}
+      <hr class="rule">
+      ${setRow('Starting balance', money0(f.start), 'editBalance')}
+      ${setRow('Forecast length', f.n+' months', 'editHorizon')}
+    </div>
+    <div class="faint" style="font-size:11.5px;line-height:1.55">A straight-line projection: it assumes your income and habits hold steady. It can't know about a raise, a move, or a big one-off — treat it as a trajectory, not a promise.</div>
+  `;
+}
+function fRow(label, amount, sub, tone){
+  const cls = tone==='good'?'good':tone==='bad'?'':'';
+  return `<div class="row" style="padding:9px 0;gap:10px">
+    <div class="grow"><div style="font-size:13.5px">${label}</div><div class="tx-sub">${sub}</div></div>
+    <div style="font-size:14px;font-weight:650;white-space:nowrap" class="${amount>=0?(tone==='good'?'good':'income'):''}">${amount<0?'−':'+'}${money0(Math.abs(amount))}</div>
+  </div>`;
+}
+function fmtFuture(m){
+  const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()+m);
+  return MON_SHORT[d.getMonth()]+' '+String(d.getFullYear()).slice(2);
+}
+
+// ── Income ───────────────────────────────────────────────────────────────
+function planIncome(){
+  const list=S.data.income||[];
+  const total=plannedIncome();
+  const observed=avgMonthlyIncomeObserved(3);
+  const byCat={};
+  list.filter(i=>i.active).forEach(i=>{ const c=i.category||'Other'; byCat[c]=(byCat[c]||0)+perMonth(i.amount,i.cadence); });
+  const cats=Object.keys(byCat).map(n=>({ name:n, amount:byCat[n], color:incomeCatBy(n).color, icon:incomeCatBy(n).icon }))
+    .sort((a,b)=>b.amount-a.amount);
+
+  return `
+    <div class="stats">
+      <div class="stat"><span>Monthly income</span><b class="income">${money0(total)}</b><small>${list.filter(i=>i.active).length} source${list.filter(i=>i.active).length===1?'':'s'}</small></div>
+      <div class="stat"><span>Per year</span><b>${money0(total*12)}</b><small>before tax changes</small></div>
+    </div>
+
+    ${observed>0 && total>0 && Math.abs(observed-total)/Math.max(observed,total)>0.15?`
+    <div class="opp" style="box-shadow:inset 0 0 0 1px rgba(245,166,35,.28)">
+      <div class="opp-ic" style="background:#332b1a;color:var(--warn)">≠</div>
+      <div class="grow"><div style="font-size:13.5px;font-weight:650">Your deposits don't match what's declared</div>
+      <div class="tx-sub">You've entered ${money0(total)}/mo here, but your actual deposits average ${money0(observed)}/mo. Worth checking which is right — the forecast uses what you declare.</div></div>
+    </div>`:''}
+
+    ${cats.length?`<div class="card card-tight">
+      <div style="font-size:13px;font-weight:600">By category</div>
+      ${cats.map(c=>`<div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;font-size:13px"><span class="swatch" style="background:${c.color};margin-right:8px"></span>${esc(c.icon)} ${esc(c.name)}<span style="margin-left:auto" class="muted">${money0(c.amount)}/mo · ${Math.round(c.amount/total*100)}%</span></div>
+        <div class="bar"><span style="width:${Math.max(5,c.amount/cats[0].amount*100).toFixed(0)}%;background:${c.color}"></span></div>
+      </div>`).join('')}
+    </div>`:''}
+
+    ${list.length?`<div class="card" style="gap:0;padding:4px 15px">
+      ${list.map(i=>`<div class="sub ${i.active?'':'off'}" data-act="editStream" data-arg="income::${i.id}" style="cursor:pointer">
+        <div class="tx-ic" style="width:36px;height:36px;background:${incomeCatBy(i.category).color}22;color:${incomeCatBy(i.category).color};font-size:16px">${esc(incomeCatBy(i.category).icon)}</div>
+        <div class="grow"><div class="sub-name nowrap" style="font-size:13.5px;font-weight:600">${esc(i.name)}</div>
+          <div class="tx-sub">${money(i.amount)} · ${cadenceLabel(i.cadence)}${i.active?` → ${money0(perMonth(i.amount,i.cadence))}/mo`:' · paused'}</div></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+      </div>`).join('')}
+    </div>`:`<div class="card"><div class="muted" style="font-size:13px;line-height:1.55">No income sources yet. Add your paycheque — and anything else that comes in regularly — and FireRaven can forecast what you'll actually keep.</div></div>`}
+
+    <button class="btn btn-primary btn-block" data-act="newStream" data-arg="income">＋ Add income source</button>
+    <button class="btn btn-ghost btn-block" data-act="go" data-arg="incomecats" style="font-size:13px">Manage income categories</button>
+  `;
+}
+
+// ── Save (ideas + habits merged) ─────────────────────────────────────────
+function planSave(){
+  const pot=potentialMonthly();
+  return `
+    <div class="hero hero-save" style="padding:15px">
+      <div><div class="section-label" style="color:var(--save)">Potential savings</div>
+      <div style="font-size:27px;font-weight:700;letter-spacing:-.02em;margin-top:2px">${money0(pot.total)}<span style="font-size:14px;font-weight:600;color:var(--muted)">/mo</span></div>
+      <div style="font-size:12px;margin-top:2px" class="muted">${pot.total>0?`about ${money0(pot.total*12)} a year`:'add more transactions and I\'ll find the slack'}</div></div>
+    </div>
+    ${saveIdeas()}
+    <div class="sec"><div class="sec-ic">🔍</div><h3>Where money leaks</h3></div>
+    ${saveLeaks()}
+  `;
+}
+
+// Tab 1 — AI cheaper alternatives.
+function saveIdeas(){
+  const sv=S.data.savings;
+  const items=(sv&&sv.items)||[];
+  const done=S.data.done||{};
+  const busy=S.ui.aiBusy;
+  return `
+    <div class="card" style="gap:11px">
+      <div class="row" style="gap:11px">
+        <div class="raven" style="width:34px;height:34px"></div>
+        <div class="grow"><div style="font-size:13.5px;font-weight:650">Cheaper versions of what you already buy</div>
+          <div class="tx-sub">FireRaven reads your repeat purchases and finds like-for-like swaps.</div></div>
+      </div>
+      <button class="btn btn-primary btn-block" data-act="findCheaper" ${busy?'disabled':''}>
+        ${busy?'<span class="typing"><i></i><i></i><i></i></span> Looking for swaps…':(items.length?'Refresh suggestions':'Find cheaper alternatives')}</button>
+      ${!hasKey()?`<div class="faint" style="font-size:11px;line-height:1.5">No API key set — you'll get FireRaven's built-in rules. <button class="link" data-act="go" data-arg="settings">Add a key</button> for suggestions tailored to your exact merchants.</div>`:''}
+      ${sv&&sv.at?`<div class="faint" style="font-size:11px">${sv.local?'Built-in rules':'Generated by FireRaven'} · ${fmtDate(isoFrom(new Date(sv.at)))}</div>`:''}
+    </div>
+
+    ${items.length?items.map((x,i)=>{
+      const id='ai-'+i, off=!!done[id];
+      return `<div class="opp ${off?'done':''}">
+        <div class="opp-ic">✦</div>
+        <div class="grow" style="display:flex;flex-direction:column;gap:5px">
+          <div class="between" style="gap:10px;align-items:flex-start">
+            <div class="opp-title" style="font-size:13.5px;font-weight:650;line-height:1.35">${esc(x.buy)}<span class="faint"> → </span>${esc(x.alt)}</div>
+            ${x.save>0?`<div class="opp-amt">${money0(x.save)}/mo</div>`:''}
+          </div>
+          <div style="font-size:12.5px;line-height:1.5" class="muted">${esc(x.why)}</div>
+          <div class="row" style="gap:8px;margin-top:3px">
+            <button class="btn-mini ${off?'on':''}" data-act="oppDone" data-arg="${id}">${off?'✓ Doing this':'I\'ll try this'}</button>
+            ${x.save>0?`<span class="faint" style="font-size:11px">${money0(x.save*12)}/yr</span>`:''}
+          </div>
+        </div>
+      </div>`;
+    }).join(''):`<div class="card card-tight"><div class="muted" style="font-size:13px;line-height:1.55">Nothing yet. Tap <b>Find cheaper alternatives</b> and FireRaven will look at what you buy over and over — coffee runs, delivery, streaming, groceries — and suggest specific swaps that cost less for the same thing.</div></div>`}
+  `;
+}
+
+// Tab 2 — subscription manager.
+function saveSubs(){
+  const subs=subscriptions();
+  const active=subs.filter(s=>!s.cancelled);
+  const off=subs.filter(s=>s.cancelled);
+  const mo=active.reduce((a,s)=>a+s.monthly,0);
+  const saved=off.reduce((a,s)=>a+s.monthly,0);
+  const regs=regulars();
+  const regMo=regs.reduce((a,r)=>a+r.monthly,0);
+
+  // Bills you've entered by hand — these are authoritative and drive the forecast.
+  const man=S.data.recur||[];
+  const manMo=manualRecurMonthly();
+  const manBlock = `
+    <div class="sec"><div class="sec-ic">📌</div><h3>Your recurring bills</h3></div>
+    <p class="muted" style="font-size:12.5px;margin-top:-2px">Entered by you, so nothing depends on FireRaven spotting it. These drive the forecast: <b>${money0(manMo)}/mo</b>.</p>
+    ${man.length?`<div class="card" style="gap:0;padding:4px 15px">
+      ${man.map(r=>`<div class="sub ${r.active?'':'off'}" data-act="editStream" data-arg="recur::${r.id}" style="cursor:pointer">
+        <div class="tx-ic" style="width:36px;height:36px;background:${catBy(r.category).color}22;color:${catBy(r.category).color};font-size:16px">${esc(catBy(r.category).icon)}</div>
+        <div class="grow"><div class="sub-name nowrap" style="font-size:13.5px;font-weight:600">${esc(r.name)}</div>
+          <div class="tx-sub">${money(r.amount)} · ${cadenceLabel(r.cadence)}${r.active?` → ${money0(perMonth(r.amount,r.cadence))}/mo`:' · paused'}${r.nextDate?` · next ${fmtDate(r.nextDate)}`:''}</div></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+      </div>`).join('')}
+    </div>`:`<div class="card card-tight"><div class="muted" style="font-size:13px;line-height:1.55">Nothing added yet. Add rent, insurance, phone, gym — anything that bills on a schedule. You can set any cadence, from weekly to yearly.</div></div>`}
+    <button class="btn btn-primary btn-block" data-act="newStream" data-arg="recur">＋ Add recurring bill</button>`;
+
+  const regBlock = regs.length?`
+    <div class="sec"><div class="sec-ic">🔄</div><h3>Regular merchants</h3></div>
+    <p class="muted" style="font-size:12.5px;margin-top:-2px">Places you buy from most months. Not subscriptions — you can't cancel them — but they're where your steady money goes: <b>${money0(regMo)}/mo</b>.</p>
+    <div class="card" style="gap:0;padding:4px 15px">
+      ${regs.map(r=>`<div class="sub">
+        <div class="tx-ic" style="width:36px;height:36px;background:${catBy(r.cat).color}22;color:${catBy(r.cat).color};font-size:16px">${esc(catBy(r.cat).icon)}</div>
+        <div class="grow"><div class="nowrap" style="font-size:13.5px;font-weight:600">${esc(r.name)}</div>
+          <div class="tx-sub">${money0(r.monthly)}/mo avg · ${r.count} visit${r.count===1?'':'s'} over ${r.nMonths} month${r.nMonths===1?'':'s'}</div></div>
+        <div class="muted" style="font-size:12px">${money0(r.annual)}/yr</div>
+      </div>`).join('')}
+    </div>`:'';
+
+  if (!subs.length) return `${manBlock}
+    <div class="sec"><div class="sec-ic">🔁</div><h3>Auto-detected</h3></div>
+    <div class="card"><div class="muted" style="font-size:13px;line-height:1.55">Nothing detected from your transactions yet. FireRaven counts something as a subscription when it's a recognised service or a steady monthly bill — not just a shop you visit often.</div></div>${regBlock}`;
+
+  const row=(s)=>`<div class="sub ${s.cancelled?'off':''}">
+    <div class="tx-ic" style="width:36px;height:36px;background:${catBy(s.cat).color}22;color:${catBy(s.cat).color};font-size:16px">${esc(catBy(s.cat).icon)}</div>
+    <div class="grow">
+      <div class="sub-name nowrap" style="font-size:13.5px;font-weight:600">${esc(s.name)}</div>
+      <div class="tx-sub">${money(s.monthly)}/mo · ${money0(s.annual)}/yr${s.cancelled?'':` · next ≈ ${fmtDate(s.next)}`}</div>
+    </div>
+    <button class="btn-mini ${s.cancelled?'on':''}" data-act="subToggle" data-arg="${esc(s.key)}">${s.cancelled?'Cancelled':'Cancel'}</button>
+  </div>`;
+
+  return `
+    <div class="stats">
+      <div class="stat"><span>Committed</span><b>${money0(committedMonthly())}<small style="font-size:12px">/mo</small></b><small>bills + subscriptions</small></div>
+      <div class="stat"><span>Yearly cost</span><b>${money0(committedMonthly()*12)}</b><small>if nothing changes</small></div>
+    </div>
+    ${manBlock}
+    <div class="sec"><div class="sec-ic">🔁</div><h3>Auto-detected subscriptions</h3></div>
+    <p class="muted" style="font-size:12.5px;margin-top:-2px">Spotted in your transactions — ${money0(mo)}/mo across ${active.length} charge${active.length===1?'':'s'}. Anything you also added by hand above is only counted once.</p>
+    ${saved>0?`<div class="opp"><div class="opp-ic">✓</div><div class="grow"><div style="font-size:13.5px;font-weight:650">${money0(saved)}/mo marked cancelled</div><div class="tx-sub">${money0(saved*12)} a year back in your pocket — once you've actually cancelled them.</div></div></div>`:''}
+    <div class="card" style="gap:0;padding:4px 15px">
+      ${active.map(row).join('')||`<div class="muted" style="font-size:13px;padding:12px 0">Everything's cancelled. Impressive.</div>`}
+    </div>
+    ${off.length?`<div class="section-label">Marked cancelled</div><div class="card" style="gap:0;padding:4px 15px">${off.map(row).join('')}</div>`:''}
+    <div class="faint" style="font-size:11.5px;line-height:1.55">Marking one "Cancelled" here only tracks your intent — you still need to cancel it with the provider. FireRaven will stop counting it toward your monthly total.</div>
+    ${regBlock}
+  `;
+}
+
+// Tab 3 — habits & leaks.
+function saveLeaks(){
+  const done=S.data.done||{};
+  const leaks=spendingLeaks();
+  if (!leaks.length) return `<div class="card"><div class="muted" style="font-size:13px;line-height:1.55">No obvious leaks right now — either your spending is tight or there isn't enough history yet. Import a couple more months and FireRaven will compare them.</div></div>`;
+  const kindLabel={ habit:'Habit', subscription:'Subscription', trend:'Trend', waste:'Waste', budget:'Budget' };
+  return leaks.map(o=>{
+    const offd=!!done[o.id];
+    return `<div class="opp ${offd?'done':''}">
+      <div class="opp-ic">${o.icon}</div>
+      <div class="grow" style="display:flex;flex-direction:column;gap:5px">
+        <div class="between" style="gap:10px;align-items:flex-start">
+          <div class="opp-title" style="font-size:13.5px;font-weight:650;line-height:1.35">${esc(o.title)}</div>
+          <div class="opp-amt">${money0(o.save)}/mo</div>
+        </div>
+        <div style="font-size:12.5px;line-height:1.5" class="muted">${o.detail}</div>
+        <div class="row" style="gap:8px;margin-top:3px">
+          <button class="btn-mini ${offd?'on':''}" data-act="oppDone" data-arg="${esc(o.id)}">${offd?'✓ Handled':'Mark handled'}</button>
+          <span class="chip chip-sm" style="pointer-events:none">${kindLabel[o.kind]||o.kind}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ---- assistant ----------------------------------------------------------
+function viewAssistant(){
+  const quick=['Where can I save?','Safe to spend today?','My forecast','My subscriptions',"How's my budget?"];
+  const statusOn=hasKey();
+  return `<div class="screen">
+    <div class="row" style="padding:calc(12px + var(--safe-top)) 18px 12px;border-bottom:1px solid var(--divider)">
+      <button class="icon-btn" data-act="go" data-arg="home" style="width:34px;height:34px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <div class="raven" style="width:38px;height:38px"></div>
+      <div class="grow"><div style="font-size:15px;font-weight:600">FireRaven</div>
+        <div style="font-size:11px;display:flex;align-items:center;gap:5px;color:${statusOn?'var(--good)':'var(--muted)'}"><span class="swatch" style="border-radius:50%;background:${statusOn?'var(--good)':'var(--muted)'}"></span>${statusOn?'Reading your spending':'Built-in mode — add a key in Settings for live chat'}</div></div>
+    </div>
+    <div class="page" id="chat-scroll" style="gap:12px;padding-bottom:12px">
+      ${S.data.messages.map(m=>{
+        if (m.role==='ai') return `<div style="display:flex;gap:8px;align-items:flex-start"><div class="raven" style="width:28px;height:28px;margin-top:2px"></div><div class="bubble b-ai">${m.typing?'<span class="typing"><i></i><i></i><i></i></span>':esc(m.text)}</div></div>`;
+        return `<div style="display:flex;justify-content:flex-end"><div class="bubble b-me">${esc(m.text)}</div></div>`;
+      }).join('')}
+    </div>
+    <div style="display:flex;gap:8px;padding:0 14px 8px;overflow-x:auto">
+      ${quick.map(q=>`<button class="chip" data-act="quick" data-arg="${esc(q)}" style="flex:none;white-space:nowrap">${esc(q)}</button>`).join('')}
+    </div>
+    <div class="row" style="gap:8px;padding:10px 14px calc(12px + var(--safe-bottom));border-top:1px solid var(--divider)">
+      <input class="input" id="chat-input" placeholder="Ask FireRaven about your money…" style="border-radius:999px" value="${esc(S.ui.draft)}">
+      <button class="btn btn-primary" data-act="send" style="border-radius:50%;width:44px;height:44px;padding:0;flex:none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></button>
+    </div>
+  </div>`;
+}
+
+// ---- review inbox -------------------------------------------------------
+function viewReview(){
+  const queue=S.data.txs.filter(t=>t.needsReview);
+  return `<div class="page nonav">
+    <div class="row"><button class="icon-btn" data-act="go" data-arg="home" style="width:34px;height:34px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg></button><div class="h-title grow">Needs review</div>${queue.length?`<span class="tag tag-new" style="font-size:12px;padding:4px 10px">${queue.length}</span>`:''}</div>
+    <p class="muted" style="font-size:13px">FireRaven couldn't confidently match these. Pick a category and confirm — it'll remember the merchant next time.</p>
+    ${queue.length ? `<div style="display:flex;flex-direction:column;gap:14px">${queue.map(reviewCard).join('')}</div>`
+      : `<div class="empty"><div class="raven" style="width:80px;height:80px"></div><div><div style="font-size:18px;font-weight:600;color:var(--text)">All caught up</div><p style="font-size:13px;margin-top:6px">Every purchase is categorized. Import more and FireRaven will flag anything unclear here.</p></div><button class="btn btn-ghost" data-act="openAdd">Add transactions</button></div>`}
+  </div>`;
+}
+function reviewCard(t){
+  const sel=S.ui.reviewSel[t.id]||guessCategory(t.merchant).cat||'Groceries';
+  return `<div class="card">
+    <div class="row">
+      <div class="tx-ic" style="color:var(--muted)">?</div>
+      <div class="grow"><div style="font-size:15px;font-weight:600" class="nowrap">${esc(t.merchant)}</div><div class="tx-sub">${fmtDate(t.date)} · ${t.source==='scan'?'from screenshot':t.source==='import'?'imported':'added'}</div></div>
+      <div style="font-size:16px;font-weight:600">−${money(t.amount)}</div>
+    </div>
+    <div class="warn" style="font-size:11px;display:flex;align-items:center;gap:6px">✦ Best guess: ${esc(sel)}</div>
+    <div class="chips">${catNames().map(c=>`<button class="chip ${sel===c?'chip-on':''}" data-act="reviewSel" data-arg="${t.id}::${esc(c)}">${esc(c)}</button>`).join('')}</div>
+    <div class="row" style="gap:9px">
+      <button class="btn btn-primary grow" data-act="reviewConfirm" data-arg="${t.id}">Confirm category</button>
+      <button class="btn btn-danger" data-act="reviewDelete" data-arg="${t.id}">Delete</button>
+    </div>
+  </div>`;
+}
+
+// ---- add / scan ---------------------------------------------------------
+function viewAdd(){
+  const sc=S.ui.scan;
+  if (sc.state==='processing'){
+    return `<div class="page nonav" style="justify-content:center;align-items:center;text-align:center;gap:24px">
+      <div style="position:relative;width:130px;height:130px;display:flex;align-items:center;justify-content:center"><div class="glow" style="width:120px;height:120px"></div><div class="raven" style="width:104px;height:104px;position:relative;animation:pulse 1.2s ease-in-out infinite"></div></div>
+      <div><div style="font-size:19px;font-weight:600" id="scan-msg">${sc.msg}</div><div class="muted" style="font-size:13px;margin-top:6px">${esc(sc.file)}</div></div>
+      <div style="width:220px"><div class="bar"><span id="scan-bar" style="width:${sc.pct}%;background:var(--accent)"></span></div><div class="muted" style="font-size:11px;margin-top:7px" id="scan-pct">${sc.pct}%</div></div>
+    </div>`;
+  }
+  if (sc.state==='done'){
+    return `<div class="page nonav" style="justify-content:center;align-items:center;text-align:center;gap:20px">
+      <div style="width:70px;height:70px;border-radius:20px;background:linear-gradient(135deg,var(--accent),#5d5294);display:flex;align-items:center;justify-content:center"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#161826" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <div><div style="font-size:22px;font-weight:600">${sc.added} transaction${sc.added===1?'':'s'} added</div>
+        <p class="muted" style="font-size:14px;margin-top:8px">FireRaven categorized them.${sc.review?` <b class="warn">${sc.review} need your review.</b>`:''}${sc.dupes?` <span class="faint">${sc.dupes} duplicate${sc.dupes===1?'':'s'} skipped.</span>`:''}</p></div>
+      <div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:280px">
+        ${sc.review?`<button class="btn btn-primary btn-block" data-act="go" data-arg="review">Review ${sc.review} now</button>`:''}
+        <button class="btn btn-ghost btn-block" data-act="go" data-arg="activity">See activity</button>
+      </div>
+    </div>`;
+  }
+  if (sc.state==='error'){
+    return `<div class="page nonav" style="justify-content:center;align-items:center;text-align:center;gap:18px">
+      <div style="width:64px;height:64px;border-radius:18px;background:#2b2028;display:flex;align-items:center;justify-content:center;color:var(--bad)"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg></div>
+      <div><div style="font-size:18px;font-weight:600">Couldn't read that</div><p class="muted" style="font-size:13px;margin-top:8px;max-width:280px">${esc(sc.error)}</p></div>
+      <button class="btn btn-ghost" data-act="openAdd">Try again</button>
+    </div>`;
+  }
+  // idle
+  const tab=S.ui.addTab;
+  const tabBtn=(k,l)=>`<button class="chip ${tab===k?'chip-on':''}" data-act="addTab" data-arg="${k}" style="flex:1;justify-content:center;padding:10px">${l}</button>`;
+  return `<div class="page nonav">
+    <div class="between"><span></span><button class="icon-btn" data-act="go" data-arg="home"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+    <div style="text-align:center"><h2 style="font-size:24px;margin-bottom:6px">Add transactions</h2><p class="muted" style="font-size:14px;max-width:300px;margin:0 auto">Snap a screenshot, import a CSV, or type one in by hand.</p></div>
+    <div class="row" style="gap:8px">${tabBtn('upload','Screenshot')}${tabBtn('manual','Manual')}${tabBtn('csv','CSV')}</div>
+    ${tab==='upload'?addUpload():tab==='csv'?addCSV():addManual()}
+  </div>`;
+}
+function addUpload(){
+  return `<div>
+    <div style="margin:20px 0;border:1.5px dashed var(--accent-800);border-radius:18px;padding:26px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px;background:var(--surface-2)">
+      <div style="position:relative;width:80px;height:80px;display:flex;align-items:center;justify-content:center"><div class="glow" style="width:80px;height:80px"></div><div class="raven" style="width:72px;height:72px;position:relative"></div></div>
+      <div style="font-size:13px" class="muted">A bank/card screenshot with many rows, or a photo of a single receipt — FireRaven works out which it's looking at. Pick several at once if you like.</div>
+    </div>
+    <button class="btn btn-primary btn-block" data-act="snapReceipt" style="font-size:15px;padding:13px;margin-bottom:10px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>Take a photo of a receipt</button>
+    <button class="btn btn-ghost btn-block" data-act="pickImage" style="font-size:15px;padding:13px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>Choose image(s) from library</button>
+    ${!hasKey()?`<p class="muted" style="font-size:12px;text-align:center;margin-top:12px">Reading screenshots needs your Anthropic key. <button class="link" data-act="go" data-arg="settings">Add it in Settings</button> — or use Manual / CSV.</p>`:''}
+  </div>`;
+}
+function addManual(){
+  const a=S.ui.add;
+  const typeBtn=(k,l)=>`<button class="chip ${a.type===k?'chip-on':''}" data-act="addType" data-arg="${k}" style="flex:1;justify-content:center">${l}</button>`;
+  return `<div style="display:flex;flex-direction:column;gap:14px;margin-top:6px">
+    <div class="row" style="gap:8px">${typeBtn('expense','Expense')}${typeBtn('income','Income')}</div>
+    <div class="field"><label>Merchant / source</label><input class="input" id="m-merchant" placeholder="e.g. Loblaws" value="${esc(a.merchant)}"></div>
+    <div class="field"><label>Amount (${cur()})</label><input class="input" id="m-amount" placeholder="0.00" inputmode="decimal" value="${esc(a.amount)}"></div>
+    <div class="field"><label>Date</label><input class="input" id="m-date" type="date" value="${esc(a.date||todayISO())}"></div>
+    ${a.type==='expense'?`<div class="field"><label>Category</label><div class="chips">${catNames().map(c=>`<button class="chip ${a.cat===c?'chip-on':''}" data-act="addCat" data-arg="${esc(c)}">${esc(catBy(c).icon)} ${esc(c)}</button>`).join('')}</div></div>`:''}
+    <div class="field"><label>Note (optional)</label><input class="input" id="m-note" placeholder="Anything to remember" value="${esc(a.note)}"></div>
+    <button class="btn btn-primary btn-block" data-act="addManual" style="padding:13px;margin-top:2px">Add transaction</button>
+  </div>`;
+}
+function addCSV(){
+  return `<div style="display:flex;flex-direction:column;gap:14px;margin-top:6px">
+    <p class="muted" style="font-size:13px">Paste rows from your bank's CSV export (or the whole file). FireRaven looks for Date, Description and Amount columns — debit/credit columns work too. No API key needed.</p>
+    <textarea class="input" id="csv-text" style="min-height:150px;font-family:ui-monospace,monospace;font-size:12px" placeholder="Date,Description,Amount&#10;2025-10-18,LOBLAWS,-84.10&#10;2025-10-18,PAYROLL,2100.00"></textarea>
+    <button class="btn btn-primary btn-block" data-act="importCSV" style="padding:13px">Import from pasted text</button>
+    <div class="row" style="justify-content:center;gap:6px"><span class="faint" style="font-size:12px">or</span></div>
+    <button class="btn btn-ghost btn-block" data-act="pickCSV">Choose a .csv file</button>
+  </div>`;
+}
+
+// ---- settings -----------------------------------------------------------
+function viewSettings(){
+  const st=S.data.settings;
+  const sampleN=S.data.txs.filter(t=>t.demo).length;
+  return `<div class="page nonav">
+    <div class="row"><button class="icon-btn" data-act="go" data-arg="home" style="width:34px;height:34px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg></button><div class="h-title">Settings</div></div>
+
+    <div class="card card-tight" style="flex-direction:row;align-items:center;gap:13px">
+      <div style="width:46px;height:46px;border-radius:50%;background:#3a3760;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600">W</div>
+      <div class="grow"><div style="font-size:16px;font-weight:600">Wes Gausman</div><div class="muted" style="font-size:12px">weswonton@gmail.com · ${cur()}</div></div>
+    </div>
+
+    <div class="section-label">Security</div>
+    <div class="card card-tight">
+      <div class="row"><div class="tx-ic" style="background:var(--accent-900);color:var(--accent-2)">🔒</div>
+        <div class="grow"><div style="font-size:14px;font-weight:600">App lock</div>
+          <div class="muted" style="font-size:11px">${st.lockOn?'A 4-digit PIN is required to open FireRaven':'Anyone with your phone can open FireRaven'}</div></div>
+        ${toggle(st.lockOn,'toggleLock')}</div>
+      ${st.lockOn?`<hr class="rule">
+      <div style="padding:0 2px">
+        ${setRow('Change PIN', '4 digits', 'changePin')}
+        <hr class="rule">
+        ${setRow('Auto-lock', st.autoLockMin>0?'after '+st.autoLockMin+' min away':'only on reopen', 'editAutoLock')}
+        <hr class="rule">
+        ${setRow('Lock now', '', 'lockNow')}
+      </div>`:''}
+      ${!cryptoOK()?`<div class="warn" style="font-size:11.5px;line-height:1.5">⚠ This page isn't on a secure origin (https), so the PIN can't be checked and the lock is inactive. Open FireRaven over https — your GitHub Pages link already is.</div>`:''}
+      <div class="muted" style="font-size:11px;line-height:1.55">Your PIN is never stored — only a salted PBKDF2 hash of it, on this device. It keeps someone holding your unlocked phone out of your finances; it is not encryption, so treat a lost device as a lost device.</div>
+    </div>
+
+    <div class="section-label">FireRaven AI</div>
+    <div class="card card-tight">
+      <div class="row"><div class="raven" style="width:34px;height:34px"></div>
+        <div class="grow"><div style="font-size:14px;font-weight:600">Anthropic API key</div><div class="muted" style="font-size:11px">${hasKey()?'Connected — screenshot reading & live chat are on':'Not set — using built-in tips & manual entry'}</div></div>
+        <span class="swatch" style="border-radius:50%;background:${hasKey()?'var(--good)':'var(--muted)'}"></span></div>
+      <input class="input" id="key-input" type="password" placeholder="sk-ant-..." value="">
+      <div class="row" style="gap:8px"><button class="btn btn-primary" data-act="saveKey" style="font-size:13px">Save key</button>${hasKey()?`<button class="btn btn-ghost" data-act="removeKey" style="font-size:13px">Remove</button>`:''}</div>
+      <div class="field"><label>Model</label><select class="input" id="model-select" data-field="model">${MODELS.map(m=>`<option value="${m.id}" ${st.model===m.id?'selected':''}>${m.label}</option>`).join('')}</select></div>
+      <div class="muted" style="font-size:11px;line-height:1.55">Stored only on this device — sent only to Anthropic when you scan or chat. Get a key at console.anthropic.com. Without one, FireRaven still works with CSV import, manual entry and built-in tips.</div>
+    </div>
+
+    <div class="section-label">Assistant</div>
+    <div class="row" style="padding:2px"><div class="raven" style="width:40px;height:40px"></div>
+      <div class="grow"><div style="font-size:14px">Home-screen insights</div><div class="muted" style="font-size:11px">Proactive tips and breakdowns</div></div>
+      ${toggle(st.insightsOn,'toggleInsights')}</div>
+
+    <div class="section-label">Money</div>
+    <div class="card card-tight" style="gap:0;padding:4px 14px">
+      ${setRow('Monthly budget', money0(st.monthlyBudget), 'editBudget')}
+      <hr class="rule">
+      ${setRow('Monthly savings goal', st.savingsGoal?money0(st.savingsGoal):'not set', 'editGoal')}
+      <hr class="rule">
+      ${setRow('Currency', cur(), 'editCurrency')}
+      <hr class="rule">
+      ${setRow('Categories & budgets', cats().length+' categories', 'go','categories')}
+    </div>
+
+    <div class="section-label">Your data</div>
+    <div class="card card-tight" style="gap:0;padding:4px 14px">
+      ${setRow('Export backup (.json)', S.data.txs.length+' transactions', 'exportJSON')}
+      <hr class="rule">
+      ${setRow('Export CSV', 'for spreadsheets', 'exportCSV')}
+      <hr class="rule">
+      ${setRow('Restore from backup', 'replaces all data', 'restore')}
+      ${S.data.txs.length===0?`<hr class="rule">${setRow('Load sample data', 'try it out', 'loadSample')}`:''}
+    </div>
+
+    <div class="section-label" style="color:var(--bad)">Danger zone</div>
+    <div class="card card-tight" style="gap:0;padding:4px 14px;box-shadow:inset 0 0 0 1px rgba(240,166,166,.2)">
+      ${sampleN>0?`${setRow('Remove sample data', sampleN+' demo transactions', 'clearSample')}<hr class="rule">`:''}
+      ${setRow('Delete all transactions', S.data.txs.length+' — keeps settings', 'clearTxs')}
+      <hr class="rule">
+      ${setRow('Erase everything & restart', 'full factory reset', 'reset')}
+    </div>
+    <div class="faint" style="font-size:11px;line-height:1.5;text-align:center;margin-top:-6px">Each of these asks you to confirm first. Export a backup before a full erase.</div>
+    <div class="faint" style="font-size:11px;text-align:center">FireRaven v${APP_VERSION} · all data stays on this device</div>
+  </div>`;
+}
+function toggle(on, act){
+  return `<button data-act="${act}" style="width:44px;height:26px;border-radius:13px;background:${on?'var(--accent)':'var(--accent-soft)'};position:relative;flex:none;border:0;cursor:pointer;transition:background .15s"><span style="position:absolute;top:3px;${on?'right:3px':'left:3px'};width:20px;height:20px;border-radius:50%;background:#161826;transition:all .15s"></span></button>`;
+}
+function setRow(label, value, act, arg){
+  return `<button class="row" data-act="${act}" ${arg?`data-arg="${arg}"`:''} style="width:100%;padding:13px 2px;text-align:left;background:0;border:0">
+    <span class="grow" style="font-size:14px">${label}</span><span class="muted" style="font-size:13px">${value}</span>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>`;
+}
+
+// ---- categories manager -------------------------------------------------
+function viewCategories(){
+  return `<div class="page nonav">
+    <div class="row"><button class="icon-btn" data-act="go" data-arg="settings" style="width:34px;height:34px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg></button><div class="h-title grow">Categories</div><button class="icon-btn" data-act="catNew"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button></div>
+    <p class="muted" style="font-size:13px">Add, rename, recolor, or set a monthly budget per category. Renaming keeps existing transactions in sync.</p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      ${cats().map(c=>`<div class="card card-tight" style="flex-direction:row;align-items:center;gap:12px" data-act="catEdit" data-arg="${esc(c.name)}">
+        <div class="tx-ic" style="background:${c.color}22;color:${c.color}">${esc(c.icon)}</div>
+        <div class="grow"><div style="font-size:14px;font-weight:600">${esc(c.name)}</div><div class="tx-sub">${c.budget?money0(c.budget)+'/mo budget':'no budget set'}</div></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+// ---- income categories manager ------------------------------------------
+function viewIncomeCats(){
+  const byCat={};
+  (S.data.income||[]).filter(i=>i.active).forEach(i=>{ const c=i.category||'Other'; byCat[c]=(byCat[c]||0)+perMonth(i.amount,i.cadence); });
+  return `<div class="page nonav">
+    <div class="row"><button class="icon-btn" data-act="go" data-arg="save" style="width:34px;height:34px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <div class="h-title grow">Income categories</div>
+      <button class="icon-btn" data-act="incNew"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button></div>
+    <p class="muted" style="font-size:13px">Group your income however makes sense — salary, freelance, rental, dividends. Each source you add gets filed under one of these.</p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      ${incomeCats().map(c=>`<div class="card card-tight" style="flex-direction:row;align-items:center;gap:12px" data-act="incEdit" data-arg="${esc(c.name)}">
+        <div class="tx-ic" style="background:${c.color}22;color:${c.color}">${esc(c.icon)}</div>
+        <div class="grow"><div style="font-size:14px;font-weight:600">${esc(c.name)}</div>
+          <div class="tx-sub">${byCat[c.name]?money0(byCat[c.name])+'/mo':'nothing assigned'}</div></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+// ---- modals -------------------------------------------------------------
+function modalView(m){
+  if (m.kind==='editTx') return editTxModal(m.id);
+  if (m.kind==='number') return numberModal(m);
+  if (m.kind==='currency') return currencyModal();
+  if (m.kind==='category') return categoryModal(m);
+  if (m.kind==='autolock') return autoLockModal();
+  if (m.kind==='stream') return streamModal(m);
+  if (m.kind==='confirm') return confirmSheet(m);
+  return '';
+}
+
+/* An in-app confirmation sheet.
+   window.confirm() is unreliable in installed PWAs — browsers may suppress it
+   and return false, which silently cancels the action. Destructive operations
+   must never depend on it. */
+function confirmSheet(m){
+  return `<div class="overlay" data-act="closeModal"><div class="sheet" data-stop="1">
+    <div class="row" style="gap:12px;align-items:flex-start">
+      <div class="tx-ic" style="background:#2b2028;color:var(--bad);font-size:18px;flex:none">${m.icon||'⚠'}</div>
+      <div class="grow"><div class="h-title" style="font-size:18px">${esc(m.title)}</div></div>
+    </div>
+    <p class="muted" style="font-size:13.5px;line-height:1.55">${m.body}</p>
+    ${m.typeToConfirm?`<div class="field"><label>Type <b>${esc(m.typeToConfirm)}</b> to confirm</label>
+      <input class="input" id="confirm-text" autocapitalize="characters" placeholder="${esc(m.typeToConfirm)}"></div>`:''}
+    <div class="row" style="gap:10px;margin-top:2px">
+      <button class="btn btn-ghost grow" data-act="closeModal">Cancel</button>
+      <button class="btn btn-danger grow" data-act="confirmYes">${esc(m.label||'Delete')}</button>
+    </div>
+  </div></div>`;
+}
+
+function streamModal(m){
+  const isIncome = m.which==='income';
+  const list = isIncome ? (S.data.income||[]) : (S.data.recur||[]);
+  const existing = m.id ? list.find(x=>x.id===m.id) : null;
+  const s = existing || { name:'', category:(isIncome?incomeCats()[0].name:'Bills'), amount:'', cadence:'monthly', nextDate:'', active:true, note:'' };
+  const cat = m.cat!==undefined ? m.cat : s.category;
+  const cad = m.cadence!==undefined ? m.cadence : s.cadence;
+  const active = m.active!==undefined ? m.active : s.active;
+  const catList = isIncome ? incomeCats() : cats();
+  const preview = m.amountPreview;
+  const f = m.form || {};
+  const val = (k, dflt)=> f[k]!==undefined ? f[k] : dflt;
+
+  return `<div class="overlay" data-act="closeModal"><div class="sheet" data-stop="1">
+    <div class="row"><div class="h-title grow" style="font-size:18px">${existing?'Edit':'New'} ${isIncome?'income source':'recurring bill'}</div>
+      <button class="icon-btn" data-act="closeModal" style="width:32px;height:32px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+
+    <div class="field"><label>Name</label><input class="input" id="s-name" value="${esc(val('name',s.name))}" placeholder="${isIncome?'e.g. Main paycheque':'e.g. Rent'}"></div>
+    <div class="field"><label>Amount (${cur()}) each time</label><input class="input" id="s-amount" inputmode="decimal" value="${esc(val('amount',s.amount||''))}" placeholder="0.00"></div>
+
+    <div class="field"><label>How often</label>
+      <div class="chips">${CADENCE_KEYS.map(k=>`<button class="chip ${cad===k?'chip-on':''}" data-act="streamCadence" data-arg="${k}">${CADENCE[k].label}</button>`).join('')}</div>
+    </div>
+    ${preview!=null?`<div class="tx-sub" style="margin-top:-6px">That works out to <b style="color:var(--${isIncome?'income':'text'})">${money(perMonth(preview,cad))}</b> per month.</div>`:''}
+
+    <div class="field"><label>Category</label>
+      <div class="chips">${catList.map(c=>`<button class="chip ${cat===c.name?'chip-on':''}" data-act="streamCat" data-arg="${esc(c.name)}">${esc(c.icon)} ${esc(c.name)}</button>`).join('')}</div>
+    </div>
+
+    <div class="field"><label>Next ${isIncome?'payment':'bill'} date (optional)</label><input class="input" id="s-next" type="date" value="${esc(val('nextDate',s.nextDate||''))}"></div>
+    <div class="field"><label>Note (optional)</label><input class="input" id="s-note" value="${esc(val('note',s.note||''))}" placeholder="Anything to remember"></div>
+
+    <div class="row" style="padding:2px"><div class="grow"><div style="font-size:14px">Active</div>
+      <div class="muted" style="font-size:11px">Paused items stay in the list but don't count</div></div>
+      ${toggle(active,'streamActive')}</div>
+
+    <div class="row" style="gap:10px;margin-top:4px">
+      <button class="btn btn-primary grow" data-act="streamSave">${existing?'Save changes':'Add'}</button>
+      ${existing?`<button class="btn btn-danger" data-act="streamDelete">Delete</button>`:''}
+    </div>
+  </div></div>`;
+}
+function autoLockModal(){
+  const cur=S.data.settings.autoLockMin;
+  const opts=[[0,'Only when reopened'],[1,'After 1 minute away'],[3,'After 3 minutes away'],[15,'After 15 minutes away']];
+  return `<div class="overlay" data-act="closeModal"><div class="sheet" data-stop="1">
+    <div class="h-title" style="font-size:18px">Auto-lock</div>
+    <p class="muted" style="font-size:13px">How long FireRaven can sit in the background before it asks for your PIN again.</p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${opts.map(([v,l])=>`<button class="btn ${cur===v?'btn-primary':'btn-ghost'} btn-block" data-act="setAutoLock" data-arg="${v}">${l}</button>`).join('')}
+    </div>
+    <button class="btn btn-ghost btn-block" data-act="closeModal">Cancel</button>
+  </div></div>`;
+}
+function editTxModal(id){
+  const t=S.data.txs.find(x=>x.id===id); if (!t) return '';
+  const d=S.ui.modal;
+  const cat=d.cat!==undefined?d.cat:(t.category||'Groceries');
+  const type=d.type!==undefined?d.type:t.type;
+  return `<div class="overlay" data-act="closeModal"><div class="sheet" data-stop="1">
+    <div class="row"><div class="h-title grow" style="font-size:18px">Edit transaction</div><button class="icon-btn" data-act="closeModal" style="width:32px;height:32px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+    <div class="row" style="gap:8px"><button class="chip ${type==='expense'?'chip-on':''}" data-act="editTxType" data-arg="expense" style="flex:1;justify-content:center">Expense</button><button class="chip ${type==='income'?'chip-on':''}" data-act="editTxType" data-arg="income" style="flex:1;justify-content:center">Income</button></div>
+    <div class="field"><label>Merchant</label><input class="input" id="e-merchant" value="${esc(t.merchant)}"></div>
+    <div class="field"><label>Amount (${cur()})</label><input class="input" id="e-amount" inputmode="decimal" value="${t.amount}"></div>
+    <div class="field"><label>Date</label><input class="input" id="e-date" type="date" value="${esc(t.date)}"></div>
+    ${type==='expense'?`<div class="field"><label>Category</label><div class="chips">${catNames().map(c=>`<button class="chip ${cat===c?'chip-on':''}" data-act="editTxCat" data-arg="${esc(c)}">${esc(catBy(c).icon)} ${esc(c)}</button>`).join('')}</div></div>`:''}
+    <div class="field"><label>Note</label><input class="input" id="e-note" value="${esc(t.note||'')}"></div>
+    <div class="row" style="gap:10px;margin-top:4px"><button class="btn btn-primary grow" data-act="saveTx" data-arg="${id}">Save changes</button><button class="btn btn-danger" data-act="deleteTx" data-arg="${id}">Delete</button></div>
+  </div></div>`;
+}
+function numberModal(m){
+  return `<div class="overlay" data-act="closeModal"><div class="sheet" data-stop="1">
+    <div class="h-title" style="font-size:18px">${m.title}</div>
+    ${m.desc?`<p class="muted" style="font-size:13px">${m.desc}</p>`:''}
+    <div class="field"><input class="input" id="num-input" inputmode="decimal" value="${m.value!=null?m.value:''}" placeholder="0"></div>
+    <div class="row" style="gap:10px"><button class="btn btn-ghost grow" data-act="closeModal">Cancel</button><button class="btn btn-primary grow" data-act="numberSave">Save</button></div>
+  </div></div>`;
+}
+function currencyModal(){
+  const opts=[['CAD','en-CA'],['USD','en-US'],['GBP','en-GB'],['EUR','en-IE'],['AUD','en-AU'],['JPY','ja-JP'],['INR','en-IN']];
+  return `<div class="overlay" data-act="closeModal"><div class="sheet" data-stop="1">
+    <div class="h-title" style="font-size:18px">Currency</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${opts.map(([c,l])=>`<button class="btn ${cur()===c?'btn-primary':'btn-ghost'} btn-block" data-act="setCurrency" data-arg="${c}::${l}">${c}</button>`).join('')}
+    </div>
+    <button class="btn btn-ghost btn-block" data-act="closeModal">Cancel</button>
+  </div></div>`;
+}
+function categoryModal(m){
+  const isNew=m.new, inc=!!m.income;
+  const pool=inc?incomeCats():cats();
+  const c=isNew?{name:'',color:inc?'#79d6a8':SWATCHES[0],icon:inc?'💵':'•',budget:0}:pool.find(x=>x.name===m.name);
+  if (!c) return '';
+  const color=m.color!==undefined?m.color:c.color;
+  const icon=m.icon!==undefined?m.icon:c.icon;
+  return `<div class="overlay" data-act="closeModal"><div class="sheet" data-stop="1">
+    <div class="row"><div class="h-title grow" style="font-size:18px">${isNew?'New category':'Edit category'}</div><button class="icon-btn" data-act="closeModal" style="width:32px;height:32px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+    <div class="field"><label>Name</label><input class="input" id="c-name" value="${esc(c.name)}" placeholder="e.g. Travel"></div>
+    <div class="field"><label>Icon (emoji)</label><input class="input" id="c-icon" value="${esc(icon)}" maxlength="2" style="width:80px;text-align:center;font-size:20px"></div>
+    <div class="field"><label>Color</label><div class="chips">${SWATCHES.map(s=>`<button data-act="catColor" data-arg="${s}" style="width:32px;height:32px;border-radius:9px;background:${s};border:2px solid ${color===s?'#fff':'transparent'}"></button>`).join('')}</div></div>
+    ${inc?'':`<div class="field"><label>Monthly budget (${cur()}, 0 = none)</label><input class="input" id="c-budget" inputmode="decimal" value="${c.budget||''}" placeholder="0"></div>`}
+    <div class="row" style="gap:10px;margin-top:4px"><button class="btn btn-primary grow" data-act="catSave" data-arg="${isNew?'':esc(c.name)}">${isNew?'Add category':'Save'}</button>${!isNew&&c.name!=='Other'?`<button class="btn btn-danger" data-act="catDelete" data-arg="${esc(c.name)}">Delete</button>`:''}</div>
+  </div></div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ACTIONS
+// ═══════════════════════════════════════════════════════════════════════
+function go(screen){ S.ui.screen=screen; if(screen==='home'||screen==='activity'||screen==='insights'){} render(); }
+
+const H = {
+  go: (el)=>go(el.dataset.arg),
+
+  // ---- app lock ----
+  pinKey: (el)=>{
+    if (S.ui.pin.length>=4) return;
+    S.ui.pinBad=false;
+    S.ui.pin += el.dataset.arg;
+    render();
+    if (S.ui.pin.length===4) setTimeout(pinSubmit, 120);
+  },
+  pinDel: ()=>{ S.ui.pin=S.ui.pin.slice(0,-1); S.ui.pinBad=false; render(); },
+  pinCancel: ()=>{ S.ui.pinMode='unlock'; S.ui.pin=''; S.ui.pinStage=0; S.ui.pinFirst=''; S.ui.pinBad=false;
+    S.locked=false; S.ui.screen='settings'; render(); },
+  changePin: ()=>{ S.ui.pinMode='set'; S.ui.pinStage=0; S.ui.pin=''; S.ui.pinFirst=''; S.ui.pinBad=false;
+    S.locked=true; render(); },
+  toggleLock: ()=>{
+    const st=S.data.settings;
+    if (st.lockOn){ st.lockOn=false; save(); render(); toast('App lock off','ok'); }
+    else { st.lockOn=true; save(); render(); toast('App lock on','ok'); }
+  },
+  editAutoLock: ()=>{ S.ui.modal={ kind:'autolock' }; render(); },
+  setAutoLock: (el)=>{ S.data.settings.autoLockMin=+el.dataset.arg; save(); S.ui.modal=null; render(); },
+  lockNow: ()=>{ S.ui.pin=''; S.ui.pinBad=false; S.ui.pinMode='unlock'; S.locked=true; render(); },
+
+  // ---- income & recurring streams ----
+  newStream: (el)=>{ S.ui.modal={ kind:'stream', which:el.dataset.arg }; render(); },
+  editStream: (el)=>{ const [which,id]=el.dataset.arg.split('::'); S.ui.modal={ kind:'stream', which, id }; render(); },
+  streamCat: (el)=>{ syncStream(); S.ui.modal.cat=el.dataset.arg; render(); },
+  streamCadence: (el)=>{ syncStream(); S.ui.modal.cadence=el.dataset.arg; render(); },
+  streamActive: ()=>{ syncStream(); const m=S.ui.modal;
+    const cur = m.active!==undefined ? m.active : streamOf(m) ? streamOf(m).active : true;
+    m.active=!cur; render(); },
+  streamSave: ()=>{
+    const m=S.ui.modal, isIncome=m.which==='income';
+    const name=($('#s-name').value||'').trim();
+    const amt=parseFloat(String($('#s-amount').value).replace(/[^0-9.]/g,''));
+    if (!name){ toast('Give it a name','err'); return; }
+    if (!amt||amt<=0){ toast('Enter a valid amount','err'); return; }
+    const existing=streamOf(m);
+    const rec=normalizeStream({
+      id: existing?existing.id:undefined,
+      name, amount:amt,
+      category: m.cat!==undefined?m.cat:(existing?existing.category:(isIncome?incomeCats()[0].name:'Bills')),
+      cadence:  m.cadence!==undefined?m.cadence:(existing?existing.cadence:'monthly'),
+      nextDate: $('#s-next').value||'',
+      note: ($('#s-note').value||'').trim(),
+      active: m.active!==undefined?m.active:(existing?existing.active:true),
+    });
+    const listKey=isIncome?'income':'recur';
+    if (!Array.isArray(S.data[listKey])) S.data[listKey]=[];
+    if (existing){ const i=S.data[listKey].findIndex(x=>x.id===existing.id); S.data[listKey][i]=rec; }
+    else S.data[listKey].push(rec);
+    save(); S.ui.modal=null; render();
+    toast((isIncome?'Income':'Bill')+' saved — '+money0(perMonth(rec.amount,rec.cadence))+'/mo','ok');
+  },
+  streamDelete: ()=>{ const m=S.ui.modal, s=streamOf(m); if (!s) return;
+    S.ui.modal={ kind:'confirm', icon:'🗑', title:'Delete "'+s.name+'"?',
+      body:'This removes it from your '+(m.which==='income'?'income list':'recurring bills')+' and from the forecast. Your transactions are untouched.',
+      label:'Delete', on:'streamDelete::'+m.which+'::'+s.id }; render(); },
+
+  // ---- plan hub ----
+  saveTab: (el)=>{ S.ui.saveTab=el.dataset.arg; render(); },
+  editBalance: ()=>{ S.ui.modal={ kind:'number', title:'Starting balance',
+    desc:'What you have in the bank right now. The forecast projects forward from this number.',
+    value:S.data.settings.startingBalance||'', on:'balance' }; render(); },
+  editHorizon: ()=>{ S.ui.modal={ kind:'number', title:'Forecast length',
+    desc:'How many months ahead to project (1–60).',
+    value:S.data.settings.forecastMonths||12, on:'horizon' }; render(); },
+
+  // ---- income categories ----
+  incNew: ()=>{ S.ui.modal={ kind:'category', new:true, income:true }; render(); },
+  incEdit: (el)=>{ S.ui.modal={ kind:'category', name:el.dataset.arg, income:true }; render(); },
+
+  // ---- destructive actions (all routed through an in-app confirm) ----
+  confirmYes: ()=>{
+    const m=S.ui.modal;
+    if (m.typeToConfirm){
+      const v=($('#confirm-text')&&$('#confirm-text').value||'').trim().toUpperCase();
+      if (v!==m.typeToConfirm.toUpperCase()){ toast('Type '+m.typeToConfirm+' to confirm','err'); return; }
+    }
+    const [act,...args]=String(m.on||'').split('::');
+    S.ui.modal=null;
+    if (DANGER[act]) DANGER[act](...args);
+  },
+  clearSample: ()=>{ const n=S.data.txs.filter(t=>t.demo).length;
+    if (!n){ toast('No sample data to remove','ok'); return; }
+    S.ui.modal={ kind:'confirm', icon:'🧹', title:'Remove sample data?',
+      body:`Deletes the <b>${n}</b> demo transaction${n===1?'':'s'} that came with the app. Anything you imported, scanned or typed in yourself is kept, along with all your settings.`,
+      label:'Remove '+n, on:'clearSample' }; render(); },
+  clearTxs: ()=>{ const n=S.data.txs.length;
+    if (!n){ toast('No transactions to delete','ok'); return; }
+    S.ui.modal={ kind:'confirm', icon:'🗑', title:'Delete all transactions?',
+      body:`Deletes all <b>${n}</b> transactions. Your categories, budgets, income, recurring bills, PIN and API key are kept.`,
+      label:'Delete '+n, on:'clearTxs' }; render(); },
+  findCheaper: ()=>{ findCheaper(); },
+  subToggle: (el)=>{ const k=el.dataset.arg;
+    if (S.data.subState[k]==='cancelled') delete S.data.subState[k]; else S.data.subState[k]='cancelled';
+    save(); render(); },
+  oppDone: (el)=>{ const id=el.dataset.arg;
+    if (S.data.done[id]) delete S.data.done[id]; else S.data.done[id]=true;
+    save(); render(); },
+  editGoal: ()=>{ S.ui.modal={ kind:'number', title:'Monthly savings goal',
+    desc:'How much would you like to free up each month? FireRaven will track its ideas against it.',
+    value:S.data.settings.savingsGoal||'', on:'goal' }; render(); },
+
+  monthPrev: ()=>{ S.ui.month=monthShiftKey(selMonth(),-1); render(); },
+  monthNext: ()=>{ const n=monthShiftKey(selMonth(),1); if (n<=curMonthKey()){ S.ui.month=n; render(); } },
+  obSkip: ()=>{ S.data.onboarded=true; save(); S.ui.screen='home'; render(); },
+  obNext: ()=>{ if (S.ui.obStep>=2){ S.data.onboarded=true; save(); S.ui.screen='home'; } else S.ui.obStep++; render(); },
+
+  openAdd: ()=>{ clearInterval(S._timer); S.ui.scan={ state:'idle', pct:0, msg:'', file:'', error:'', added:0, review:0 }; S.ui.addTab='upload'; S.ui.screen='add'; render(); },
+  addTab: (el)=>{ syncManual(); S.ui.addTab=el.dataset.arg; render(); },
+  addType: (el)=>{ syncManual(); S.ui.add.type=el.dataset.arg; render(); },
+  addCat: (el)=>{ syncManual(); S.ui.add.cat=el.dataset.arg; render(); },
+  pickImage: ()=>$('#img-input').click(),
+  snapReceipt: ()=>$('#cam-input').click(),
+  pickCSV: ()=>{ const i=document.createElement('input'); i.type='file'; i.accept='.csv,text/csv'; i.onchange=(e)=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>doImportCSV(String(r.result)); r.readAsText(f); }; i.click(); },
+  importCSV: ()=>{ const el=$('#csv-text'); doImportCSV(el?el.value:''); },
+  addManual: ()=>{
+    syncManual(); const a=S.ui.add;
+    const amt=parseFloat(String(a.amount).replace(/[^0-9.]/g,''));
+    if (!a.merchant.trim()||!amt||amt<=0){ toast('Enter a merchant and a valid amount','err'); return; }
+    const cat=a.type==='income'?null:a.cat;
+    if (cat) learnMerchant(a.merchant, cat);
+    S.data.txs.unshift({ id:uid('m'), merchant:a.merchant.trim(), category:cat, amount:Math.abs(amt), type:a.type, date:a.date||todayISO(), note:a.note.trim(), needsReview:false, source:'manual' });
+    sortTxs(); save();
+    S.ui.add={ merchant:'', amount:'', cat:'Groceries', type:'expense', date:'', note:'' };
+    S.ui.screen='activity'; S.ui.month=null; render();
+    toast('Transaction added','ok');
+  },
+
+  // review
+  reviewSel: (el)=>{ const [id,c]=el.dataset.arg.split('::'); S.ui.reviewSel[id]=c; render(); },
+  reviewConfirm: (el)=>{ const id=el.dataset.arg; const t=S.data.txs.find(x=>x.id===id); if(!t) return;
+    const cat=S.ui.reviewSel[id]||guessCategory(t.merchant).cat||'Groceries';
+    t.category=cat; t.needsReview=false; learnMerchant(t.merchant,cat); save();
+    delete S.ui.reviewSel[id]; render(); toast('Categorized as '+cat,'ok'); },
+  reviewDelete: (el)=>{ const id=el.dataset.arg; S.data.txs=S.data.txs.filter(t=>t.id!==id); save(); render(); },
+
+  // edit tx
+  editTx: (el)=>{ S.ui.modal={ kind:'editTx', id:el.dataset.arg }; render(); },
+  editTxCat: (el)=>{ S.ui.modal.cat=el.dataset.arg; render(); },
+  editTxType: (el)=>{ S.ui.modal.type=el.dataset.arg; render(); },
+  saveTx: (el)=>{ const id=el.dataset.arg; const t=S.data.txs.find(x=>x.id===id); if(!t) return;
+    const merchant=($('#e-merchant').value||'').trim();
+    const amt=parseFloat(String($('#e-amount').value).replace(/[^0-9.]/g,''));
+    if (!merchant||!amt||amt<=0){ toast('Enter a merchant and a valid amount','err'); return; }
+    const type=S.ui.modal.type!==undefined?S.ui.modal.type:t.type;
+    const cat=type==='income'?null:(S.ui.modal.cat!==undefined?S.ui.modal.cat:(t.category||'Groceries'));
+    t.merchant=merchant; t.amount=Math.abs(amt); t.type=type; t.category=cat;
+    t.date=$('#e-date').value||t.date; t.note=($('#e-note').value||'').trim(); t.needsReview=false;
+    if (cat) learnMerchant(merchant,cat);
+    sortTxs(); save(); S.ui.modal=null; render(); toast('Saved','ok'); },
+  deleteTx: (el)=>{ const id=el.dataset.arg; S.data.txs=S.data.txs.filter(t=>t.id!==id); save(); S.ui.modal=null; render(); toast('Deleted','ok'); },
+  closeModal: ()=>{ S.ui.modal=null; render(); },
+
+  // assistant
+  quick: (el)=>ask(el.dataset.arg),
+  send: ()=>{ const el=$('#chat-input'); ask(el?el.value:''); },
+
+  // settings
+  saveKey: ()=>{ const k=($('#key-input').value||'').trim(); if(!k){ toast('Paste your key first','err'); return; }
+    S.apiKey=k; try{ localStorage.setItem(LS_APIKEY,k); }catch(e){} render(); toast('Key saved — AI features on','ok'); },
+  removeKey: ()=>{ S.apiKey=''; try{ localStorage.removeItem(LS_APIKEY); }catch(e){} render(); toast('Key removed','ok'); },
+  toggleInsights: ()=>{ S.data.settings.insightsOn=!S.data.settings.insightsOn; save(); render(); },
+  editBudget: ()=>{ S.ui.modal={ kind:'number', title:'Monthly budget', desc:'Your target spend per month in '+cur()+'.', value:S.data.settings.monthlyBudget, on:'budget' }; render(); },
+  editCurrency: ()=>{ S.ui.modal={ kind:'currency' }; render(); },
+  setCurrency: (el)=>{ const [c,l]=el.dataset.arg.split('::'); S.data.settings.currency=c; S.data.settings.locale=l; save(); S.ui.modal=null; render(); toast('Currency set to '+c,'ok'); },
+  numberSave: ()=>{ const v=parseFloat(String($('#num-input').value).replace(/[^0-9.]/g,'')); const m=S.ui.modal;
+    if (m.on==='budget'){ if(v>=0){ S.data.settings.monthlyBudget=Math.round(v); save(); } }
+    if (m.on==='goal'){ S.data.settings.savingsGoal = v>=0 ? Math.round(v) : 0; save(); }
+    if (m.on==='balance'){ S.data.settings.startingBalance = isNaN(v) ? 0 : Math.round(v); save(); }
+    if (m.on==='horizon'){ S.data.settings.forecastMonths = Math.min(60, Math.max(1, Math.round(v)||12)); save(); }
+    S.ui.modal=null; render(); },
+  exportJSON, exportCSV,
+  restore: ()=>$('#restore-input').click(),
+  loadSample: ()=>{ loadSample(); render(); toast('Sample data loaded','ok'); },
+  reset: ()=>{ S.ui.modal={ kind:'confirm', icon:'💥', title:'Erase everything?',
+    body:'Deletes every transaction, your categories, budgets, income, recurring bills, chat history, saved API key and PIN from this device. <b>This cannot be undone.</b><br><br>Export a backup first if you might want any of it back.',
+    label:'Erase everything', typeToConfirm:'ERASE', on:'reset' }; render(); },
+
+  // categories
+  catNew: ()=>{ S.ui.modal={ kind:'category', new:true }; render(); },
+  catEdit: (el)=>{ S.ui.modal={ kind:'category', name:el.dataset.arg }; render(); },
+  catColor: (el)=>{ S.ui.modal.color=el.dataset.arg; render(); },
+  catSave: (el)=>{ const orig=el.dataset.arg; const m=S.ui.modal;
+    const name=($('#c-name').value||'').trim();
+    const icon=($('#c-icon').value||'•').trim()||'•';
+    if (!name){ toast('Enter a name','err'); return; }
+    if (m.income){
+      const pool=incomeCats();
+      if (!orig && pool.some(c=>c.name===name)){ toast('That category already exists','err'); return; }
+      const color=m.color||(orig?incomeCatBy(orig).color:'#79d6a8');
+      if (orig){
+        const c=pool.find(x=>x.name===orig);
+        if (name!==orig) (S.data.income||[]).forEach(i=>{ if(i.category===orig) i.category=name; });
+        c.name=name; c.icon=icon; c.color=color;
+      } else pool.push({ name, icon, color });
+      S.data.incomeCats=pool;
+      save(); S.ui.modal=null; render(); toast('Saved','ok'); return;
+    }
+    const color=m.color||(orig?catBy(orig).color:SWATCHES[0]);
+    const budget=parseFloat(String($('#c-budget').value).replace(/[^0-9.]/g,''))||0;
+    if (!orig && catNames().includes(name)){ toast('That category already exists','err'); return; }
+    if (orig){
+      const c=cats().find(x=>x.name===orig);
+      if (name!==orig){ // rename: migrate txs + merchantMap
+        S.data.txs.forEach(t=>{ if(t.category===orig) t.category=name; });
+        Object.keys(S.data.merchantMap).forEach(k=>{ if(S.data.merchantMap[k]===orig) S.data.merchantMap[k]=name; });
+      }
+      c.name=name; c.icon=icon; c.color=color; c.budget=Math.round(budget);
+    } else {
+      cats().push({ name, icon, color, budget:Math.round(budget) });
+    }
+    save(); S.ui.modal=null; render(); toast('Saved','ok'); },
+  catDelete: (el)=>{ const name=el.dataset.arg; const inc=S.ui.modal&&S.ui.modal.income;
+    S.ui.modal={ kind:'confirm', icon:'🗑', title:'Delete "'+name+'"?',
+      body: inc ? 'Income sources using this category will move to Other.'
+                : 'Its transactions will move to Other. Nothing is deleted.',
+      label:'Delete', on:(inc?'incCatDelete::':'catDelete::')+name }; render(); },
+};
+
+// Destructive operations, isolated so the confirm sheet is the only way in.
+const DANGER = {
+  reset: ()=>{
+    try{ localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_KEY_LEGACY);
+         localStorage.removeItem(LS_APIKEY); localStorage.removeItem(LS_PIN);
+         localStorage.removeItem(LS_SEEN); localStorage.removeItem(LS_FAIL); }catch(e){}
+    S.apiKey=''; S.data=freshData(); S.ui.screen='onboarding'; S.ui.obStep=0;
+    S.locked=false; save(); render(); toast('Everything erased','ok');
+  },
+  clearSample: ()=>{ const before=S.data.txs.length;
+    S.data.txs=S.data.txs.filter(t=>!t.demo);
+    save(); render(); toast((before-S.data.txs.length)+' sample transactions removed','ok'); },
+  clearTxs: ()=>{ const n=S.data.txs.length; S.data.txs=[]; S.data.savings=null; S.data.done={};
+    save(); render(); toast(n+' transactions deleted','ok'); },
+  catDelete: (name)=>{
+    S.data.txs.forEach(t=>{ if(t.category===name) t.category='Other'; });
+    Object.keys(S.data.merchantMap).forEach(k=>{ if(S.data.merchantMap[k]===name) delete S.data.merchantMap[k]; });
+    (S.data.recur||[]).forEach(r=>{ if(r.category===name) r.category='Other'; });
+    S.data.categories=cats().filter(c=>c.name!==name);
+    save(); render(); toast('Category deleted','ok'); },
+  incCatDelete: (name)=>{
+    (S.data.income||[]).forEach(i=>{ if(i.category===name) i.category='Other'; });
+    S.data.incomeCats=incomeCats().filter(c=>c.name!==name);
+    save(); render(); toast('Category deleted','ok'); },
+  streamDelete: (which, id)=>{
+    const key = which==='income'?'income':'recur';
+    S.data[key]=(S.data[key]||[]).filter(x=>x.id!==id);
+    save(); render(); toast('Deleted','ok'); },
+};
+function streamOf(m){
+  if (!m || !m.id) return null;
+  const list = m.which==='income' ? (S.data.income||[]) : (S.data.recur||[]);
+  return list.find(x=>x.id===m.id) || null;
+}
+// Tapping a category or cadence chip re-renders the whole sheet, which would
+// wipe anything already typed. Stash the live field values first.
+function syncStream(){
+  const m=S.ui.modal; if (!m) return;
+  m.form = m.form || {};
+  [['s-name','name'],['s-amount','amount'],['s-next','nextDate'],['s-note','note']].forEach(([id,k])=>{
+    const el=$('#'+id); if (el) m.form[k]=el.value;
+  });
+  const v=parseFloat(String(m.form.amount||'').replace(/[^0-9.]/g,''));
+  m.amountPreview = isNaN(v) ? null : v;
+}
+
+async function pinSubmit(){
+  const entered=S.ui.pin;
+  if (S.ui.pinMode==='set'){
+    if (S.ui.pinStage===0){ S.ui.pinFirst=entered; S.ui.pinStage=1; S.ui.pin=''; render(); return; }
+    if (entered!==S.ui.pinFirst){ S.ui.pinBad=true; S.ui.pin=''; S.ui.pinStage=0; S.ui.pinFirst=''; render(); return; }
+    await pinSet(entered);
+    S.data.settings.lockOn=true; save();
+    S.ui.pinMode='unlock'; S.ui.pin=''; S.ui.pinStage=0; S.ui.pinFirst=''; S.ui.pinBad=false;
+    S.locked=false; touchSeen(); S.ui.screen='settings'; render();
+    toast('PIN updated','ok'); return;
+  }
+  if (lockoutLeft()){ S.ui.pin=''; S.ui.pinBad=true; render(); return; }
+  const ok=await pinVerify(entered);
+  if (ok){ clearFails(); S.locked=false; S.ui.pin=''; S.ui.pinBad=false; touchSeen(); render(); }
+  else { noteFail(); S.ui.pinBad=true; S.ui.pin=''; render();
+    if (navigator.vibrate) try{ navigator.vibrate(90); }catch(e){}
+    setTimeout(()=>{ S.ui.pinBad=false; if (S.locked) render(); }, 700); }
+}
+
+function syncManual(){
+  const g=(id)=>{ const el=$('#'+id); return el?el.value:undefined; };
+  const m=g('m-merchant'), a=g('m-amount'), d=g('m-date'), n=g('m-note');
+  if (m!==undefined) S.ui.add.merchant=m;
+  if (a!==undefined) S.ui.add.amount=a;
+  if (d!==undefined) S.ui.add.date=d;
+  if (n!==undefined) S.ui.add.note=n;
+}
+function doImportCSV(text){
+  if (!text || !text.trim()){ toast('Paste some CSV rows first','err'); return; }
+  const items=csvToItems(text);
+  if (!items.length){ toast("Couldn't find transactions in that CSV",'err'); return; }
+  S.ui.screen='add'; finishBatch(items,'import');
+}
+
+// ---- chat ---------------------------------------------------------------
+function systemPrompt(){
+  const list=S.data.txs.slice(0,60);
+  const key=curMonthKey();
+  const mt=monthTxs(key);
+  const spent=sumExpenses(mt);
+  const totals=categoryTotals(mt).map(c=>c.name+' '+money(c.amount)).join(', ');
+  const review=S.data.txs.filter(t=>t.needsReview).length;
+  const rows=list.map(t=>t.date+' · '+t.merchant+' · '+(t.type==='income'?'+':'-')+money(t.amount)+' · '+(t.category||(t.type==='income'?'Income':'NEEDS REVIEW'))).join('\n');
+  const subs=subscriptions().filter(s=>!s.cancelled);
+  const cf=cashflow(key);
+  const pot=potentialMonthly();
+  const sts=safeToSpend(key);
+  const fc=forecast();
+  const inc=activeIncome();
+  const bills=activeRecur();
+  const extra = "\nIncome this month: "+money(cf.income)+(cf.rate!=null?" ("+Math.round(cf.rate)+"% kept)":"")
+    +".\nDeclared income sources ("+inc.length+"): "+(inc.map(i=>i.name+' '+money(i.amount)+' '+cadenceLabel(i.cadence).toLowerCase()+' = '+money0(perMonth(i.amount,i.cadence))+'/mo').join(', ')||'none')
+    +".\nRecurring bills entered by hand ("+bills.length+"): "+(bills.map(r=>r.name+' '+money0(perMonth(r.amount,r.cadence))+'/mo').join(', ')||'none')
+    +".\nSubscriptions ("+subs.length+"): "+(subs.map(s=>s.name+' '+money(s.monthly)+'/mo').join(', ')||'none detected')
+    +".\nForecast: income "+money0(fc.income)+"/mo, commitments "+money0(fc.committed)+"/mo, everyday spending "+money0(fc.variable)+"/mo, net "+(fc.net>=0?'+':'')+money0(fc.net)+"/mo. Starting balance "+money0(fc.start)+", projected balance in 6 months "+money0(fc.at(6))+", in 12 months "+money0(fc.at(12))+(fc.runway!=null?". WARNING: at this rate the balance runs out in about "+fc.runway.toFixed(1)+" months":"")
+    +".\nSafe to spend: "+(sts?money(sts.perDay)+"/day for "+sts.daysLeft+" days left":"n/a")
+    +".\nSavings opportunities FireRaven has already found: "+money0(pot.total)+"/mo. Top ideas: "
+    +(opportunities().slice(0,4).map(o=>o.title+' ('+money0(o.save)+'/mo)').join('; ')||'none yet')+".";
+  return "You are FireRaven, a sharp, warm, witty pet-raven money assistant inside a personal spending-tracker app used by Wes. ALWAYS concise (2-4 sentences), direct and data-driven. Currency is "+cur()+"; format money like "+money(84.1)+". Use ONLY the data below — never invent transactions or numbers. If the data can't answer, say so briefly and suggest importing more. When giving savings advice, cite specific dollar amounts. Plain text only — no markdown, asterisks, bullets or headings.\n\n=== WES'S SPENDING ("+monthLabel(key)+") ===\nSpent this month: "+money(spent)+" across "+mt.filter(t=>t.type!=='income').length+" purchases.\nMonthly budget: "+money(S.data.settings.monthlyBudget)+".\nBy category: "+(totals||'none yet')+".\nItems needing a category: "+review+"."+extra+"\nRecent transactions (newest first):\n"+rows;
+}
+function ask(text){
+  const t=(text||'').trim(); if(!t) return;
+  const history=S.data.messages.filter(m=>m.text&&!m.typing).map(m=>({ role:m.role==='ai'?'assistant':'user', content:m.text }));
+  S.data.messages.push({ role:'me', text:t });
+  S.data.messages.push({ role:'ai', text:'', typing:true });
+  S.ui.draft=''; render();
+  answer(history, t);
+}
+async function answer(history, t){
+  let ans;
+  try { ans = hasKey() ? await llm({ system:systemPrompt(), messages:[...history,{ role:'user', content:t }], max_tokens:400 }) : localReply(t); }
+  catch(e){ ans = localReply(t); }
+  if (!ans || !ans.trim()) ans = localReply(t);
+  for (let i=S.data.messages.length-1;i>=0;i--){ if (S.data.messages[i].typing){ S.data.messages[i]={ role:'ai', text:ans }; break; } }
+  save(); render();
+}
+function localReply(t){
+  const s=t.toLowerCase();
+  const mt=monthTxs(curMonthKey());
+  const ct=categoryTotals(mt);
+  const rec=recurring();
+  const get=(n)=>{ const c=ct.find(x=>x.name===n); return c?c.amount:0; };
+  const spent=sumExpenses(mt), budget=S.data.settings.monthlyBudget;
+  if (/dining|eat|restaurant/.test(s)){ const d=get('Dining'); return d?`Dining is at ${money(d)} this month. Cooking a couple of those at home would save roughly ${money0(d*0.3)}.`:"No dining purchases logged this month yet."; }
+  if (/save|cut|cheap|afford/.test(s)){
+    const ops=opportunities().filter(o=>!(S.data.done||{})[o.id]).slice(0,2);
+    const pot=potentialMonthly();
+    return ops.length
+      ? `I've found about ${money0(pot.total)}/mo you could free up — roughly ${money0(pot.total*12)} a year. Biggest one: ${ops[0].title.replace(/<[^>]*>/g,'')} at ${money0(ops[0].save)}/mo.${ops[1]?` Next: ${ops[1].title.replace(/<[^>]*>/g,'')} (${money0(ops[1].save)}/mo).`:''} Open the Save tab for the full list.`
+      : 'Import a few more transactions and I\'ll find specific cuts from your real spending.'; }
+  if (/subscription|recurring/.test(s)){
+    const subs=subscriptions().filter(x=>!x.cancelled);
+    return subs.length
+      ? `You have ${subs.length} subscription${subs.length>1?'s':''} costing ${money0(subs.reduce((a,r)=>a+r.monthly,0))}/mo — about ${money0(subs.reduce((a,r)=>a+r.annual,0))} a year. ${subs[0].name} is the biggest at ${money(subs[0].monthly)}/mo.`
+      : 'No true subscriptions detected yet — those appear once a recognised service or steady bill shows up across two months.'; }
+  if (/forecast|balance|future|project|runway|in 6 month|in a year|end up/.test(s)){
+    const f=forecast();
+    if (f.income<=0 && f.outflow<=0) return 'Add your income in Plan → Income and import some spending, and I\'ll project your balance forward.';
+    if (f.runway!=null) return `At ${money0(-f.net)}/mo short, your ${money0(f.start)} balance lasts about ${f.runway.toFixed(1)} months. Cutting ${money0(-f.net)}/mo breaks even — the Save tab has ideas.`;
+    return `You're keeping about ${money0(f.net)}/mo. From your ${money0(f.start)} starting balance, that's roughly ${money0(f.at(6))} in 6 months and ${money0(f.at(12))} in a year.`; }
+  if (/income|earn|paycheque|paycheck|salary/.test(s)){
+    const inc=activeIncome();
+    return inc.length ? `You've declared ${inc.length} income source${inc.length>1?'s':''} totalling ${money0(plannedIncome())}/mo: ${inc.map(i=>i.name+' ('+money0(perMonth(i.amount,i.cadence))+'/mo)').join(', ')}.`
+      : 'No income sources declared yet — add your paycheque under Plan → Income and I can forecast what you\'ll keep.'; }
+  if (/safe|today|per day|daily/.test(s)){ const st=safeToSpend(curMonthKey());
+    return st ? (st.over ? `You're ${money0(Math.abs(st.remaining))} past your budget with ${st.daysLeft} days to go.` : `You can spend about ${money(st.perDay)} a day for the ${st.daysLeft} days left and still land on budget.`)
+              : 'Set a monthly budget in Settings and I\'ll tell you what\'s safe to spend each day.'; }
+  if (/budget/.test(s)){ return budget>0?`You're at about ${Math.round(spent/budget*100)}% of your ${money0(budget)} budget this month (${money0(spent)} spent).`:'You haven\'t set a monthly budget yet — add one in Settings.'; }
+  if (/review|unknown|uncategor/.test(s)){ const r=S.data.txs.filter(t=>t.needsReview).length; return r?`There are ${r} purchases waiting in Needs review — open the inbox and I'll suggest a category for each.`:"Everything's categorized — nothing waiting in review."; }
+  return `This month you've spent ${money0(spent)} across ${mt.filter(t=>t.type!=='income').length} purchases. Ask me about a category, your subscriptions, budget, or where to save.`;
+}
+
+// ---- sample data --------------------------------------------------------
+function loadSample(){
+  const base=new Date();
+  const mk=(daysAgo,merchant,cat,amount,type,source)=>{ const d=new Date(base); d.setDate(d.getDate()-daysAgo);
+    // demo:true is what "Remove sample data" keys on — `source` varies here on
+    // purpose (some rows pose as scanned) so it can't be the marker.
+    return { id:uid('s'), merchant, category:type==='income'?null:cat, amount, type:type||'expense', date:isoFrom(d), note:'', needsReview:false, source:source||'seed', demo:true }; };
+  S.data.txs = [
+    mk(1,'Loblaws','Groceries',84.10),
+    mk(1,'Café Local','Dining',12.75),
+    mk(2,'SQ *MRKT 8891',null,46.00,'expense','scan'),
+    mk(3,'Spotify','Subscriptions',11.29),
+    mk(4,'Petro-Canada','Transport',68.40),
+    mk(5,'Uniqlo','Shopping',92.14),
+    mk(7,'The Keg','Dining',118.60),
+    mk(8,'Metro','Groceries',74.22),
+    mk(10,'INTERAC e-Transfer',null,27.00,'expense','scan'),
+    mk(12,'Hydro One','Bills',96.30),
+    mk(2,'Payroll',null,2100.00,'income'),
+    mk(14,'Tim Hortons','Dining',6.85),
+    mk(16,'Costco','Groceries',214.50),
+    mk(16,'Netflix','Subscriptions',20.99),
+    mk(18,'Canadian Tire','Shopping',63.40),
+    mk(20,'Rogers','Bills',85.00),
+    // prior month for a real trend
+    mk(34,'Spotify','Subscriptions',11.29),
+    mk(35,'Loblaws','Groceries',77.40),
+    mk(38,'The Keg','Dining',96.20),
+    mk(42,'Netflix','Subscriptions',20.99),
+    mk(45,'Rogers','Bills',85.00),
+    mk(48,'Petro-Canada','Transport',61.10),
+    mk(64,'Spotify','Subscriptions',11.29),
+    mk(66,'Netflix','Subscriptions',20.99),
+    mk(70,'Costco','Groceries',188.30),
+  ];
+  // set a couple to needs-review to demo the inbox
+  S.data.txs.filter(t=>t.category===null&&t.type==='expense').forEach(t=>{ t.needsReview=true; });
+  sortTxs(); save();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// EVENT WIRING
+// ═══════════════════════════════════════════════════════════════════════
+document.addEventListener('click', (e)=>{
+  const el=e.target.closest('[data-act]');
+  if (!el) return;
+  /* Tapping inside a sheet must not fall through to the overlay's close
+     handler. closest() already resolves to the innermost [data-act], so a real
+     button wins on its own; the only case to suppress is a tap that landed on
+     dead space inside the sheet and walked all the way up to the backdrop.
+
+     This used to be done with a capture-phase stopPropagation(), which killed
+     the event before it ever reached this delegated listener — every control
+     inside every sheet was inert. */
+  if (el.classList.contains('overlay') && e.target.closest('[data-stop]')) return;
+  const act=el.dataset.act;
+  if (H[act]){ e.preventDefault(); H[act](el); }
+});
+
+// live search (partial re-render of list only)
+document.addEventListener('input', (e)=>{
+  const el=e.target;
+  if (el.id==='act-search'){ S.ui.search=el.value; updateActivityList(); }
+  else if (el.dataset && el.dataset.field==='model'){ S.data.settings.model=el.value; save(); }
+});
+document.addEventListener('keydown', (e)=>{
+  if (e.key==='Enter' && e.target.id==='chat-input'){ e.preventDefault(); ask(e.target.value); }
+});
+// filter chips update state then full render (chips need active repaint)
+// handled by H via data-act
+H.filterCat = (el)=>{ S.ui.filterCat=el.dataset.arg; render(); };
+
+function updateActivityList(){
+  // rebuild only #act-list to preserve search-input focus
+  const key=selMonth();
+  let list=monthTxs(key);
+  const q=S.ui.search.trim().toLowerCase();
+  const fc=S.ui.filterCat;
+  if (fc!=='All') list = fc==='Income' ? list.filter(t=>t.type==='income') : list.filter(t=>t.category===fc);
+  if (q) list=list.filter(t=>t.merchant.toLowerCase().includes(q)||(t.note||'').toLowerCase().includes(q)||(t.category||'').toLowerCase().includes(q));
+  const groups={}; list.forEach(t=>{ (groups[t.date]=groups[t.date]||[]).push(t); });
+  const dates=Object.keys(groups).sort().reverse();
+  const node=$('#act-list'); if (!node) return;
+  node.innerHTML = dates.length
+    ? dates.map(d=>`<div><div class="tx-sub" style="margin:2px 6px 4px;font-weight:600">${fmtDate(d)}</div>${groups[d].map(txRow).join('')}</div>`).join('')
+    : `<p class="muted" style="font-size:13px;margin-top:6px">Nothing matches.</p>`;
+}
+
+// file inputs
+$('#img-input').addEventListener('change', (e)=>{
+  const files=Array.from(e.target.files||[]); e.target.value='';
+  if (files.length) scanFiles(files);
+});
+$('#cam-input').addEventListener('change', (e)=>{
+  const files=Array.from(e.target.files||[]); e.target.value='';
+  if (files.length) scanFiles(files);
+});
+$('#restore-input').addEventListener('change', (e)=>{
+  const f=e.target.files&&e.target.files[0]; e.target.value='';
+  if (!f) return; const r=new FileReader(); r.onload=()=>restoreJSON(String(r.result)); r.readAsText(f);
+});
+
+// physical keyboard on the lock screen (desktop convenience)
+document.addEventListener('keydown', (e)=>{
+  if (!S.locked) return;
+  if (/^[0-9]$/.test(e.key)){ e.preventDefault(); H.pinKey({ dataset:{ arg:e.key } }); }
+  else if (e.key==='Backspace'){ e.preventDefault(); H.pinDel(); }
+});
+
+// auto-lock when the app goes to the background
+document.addEventListener('visibilitychange', ()=>{
+  if (document.visibilityState==='hidden'){ touchSeen(); }
+  else if (!S.locked && shouldRelock()){ S.ui.pin=''; S.ui.pinMode='unlock'; S.locked=true; render(); }
+});
+window.addEventListener('pagehide', touchSeen);
+
+// ---- boot ---------------------------------------------------------------
+load();
+S.data.settings.model = S.data.settings.model || 'claude-haiku-4-5';
+S.ui.add.cat = catNames()[0] || 'Groceries';
+// Home-screen shortcuts (manifest.webmanifest) land here with ?a=<screen>.
+// They pick the destination; the PIN lock below still gates entry to it.
+try {
+  const a = new URLSearchParams(location.search).get('a');
+  if (a && S.data.onboarded && ['add','assistant','save','insights','activity'].includes(a)) S.ui.screen = a;
+} catch(e){}
+S.locked = lockEnabled() && S.data.onboarded;
+if (!S.locked) touchSeen();
+render();
+
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>
