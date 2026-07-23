@@ -256,6 +256,7 @@ hr.rule{border:0;height:1px;background:var(--divider);margin:2px 0}
 .pad button:active{background:var(--accent-900)}
 .pad button.blank{background:none;box-shadow:none;pointer-events:none}
 .pad button.fn{font-size:13px;font-weight:600;background:none;box-shadow:none;color:var(--muted)}
+.mask-text{-webkit-text-security:disc;text-security:disc}
 </style>
 </head>
 <body>
@@ -279,7 +280,7 @@ const LS_APIKEY = 'fireraven_key';
 const LS_PIN = 'fireraven_pin';     // { salt, hash, iters } — never the PIN itself
 const LS_SEEN = 'fireraven_seen';   // last-active timestamp, for auto-lock
 const LS_FAIL = 'fireraven_fail';   // { n, until } — PIN attempt throttling
-const APP_VERSION = 6;
+const APP_VERSION = 7;
 
 /* ── App lock ──────────────────────────────────────────────────────────
    The starting PIN is 1177, but this repository is public, so only a
@@ -330,6 +331,21 @@ const MODELS = [
   { id:'claude-sonnet-5',   label:'Sonnet 5 — best accuracy' },
   { id:'claude-opus-4-8',   label:'Opus 4.8 — most capable' },
 ];
+/* iOS Safari and Android Chrome are documented to ignore autocomplete="off"
+   specifically on type="password" fields — a deliberate browser decision so
+   sites can't disable the password manager. That means a field the user once
+   typed a wrong key into can get silently re-filled from the OS keychain on a
+   later visit, even with every autocomplete/autofill attribute set correctly.
+   The fix is to not use type="password" for the API key field at all: a
+   type="text" field styled with -webkit-text-security isn't recognized as a
+   login credential by autofill heuristics in the first place. Falls back to
+   real type="password" on browsers without that CSS property (Firefox), which
+   does honor autocomplete="off" for password fields. */
+const CAN_MASK_TEXT = (function(){
+  try { return CSS.supports('-webkit-text-security','disc') || CSS.supports('text-security','disc'); }
+  catch(e){ return false; }
+})();
+
 const MON_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MON_LONG  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -2223,7 +2239,9 @@ function viewSettings(){
           <div class="muted" style="font-size:11px">${hasKey()?`Saved — ends in …${esc(S.apiKey.slice(-4))}`:'Not set — using built-in tips & manual entry'}</div></div>
         <span class="swatch" style="border-radius:50%;background:${hasKey()?'var(--good)':'var(--muted)'}"></span></div>
       <div class="row" style="gap:8px">
-        <input class="input grow" id="key-input" type="${S.ui.showKey?'text':'password'}" placeholder="sk-ant-..." value=""
+        <input class="input grow ${(!S.ui.showKey&&CAN_MASK_TEXT)?'mask-text':''}"
+          id="key-input" type="${CAN_MASK_TEXT?'text':(S.ui.showKey?'text':'password')}"
+          placeholder="sk-ant-..." value="" name="fr-secret-${APP_VERSION}"
           autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
           data-lpignore="true" data-1p-ignore data-bwignore data-form-type="other">
         <button class="icon-btn" data-act="toggleKeyVis" style="flex:none" title="${S.ui.showKey?'Hide':'Show'}">${S.ui.showKey
