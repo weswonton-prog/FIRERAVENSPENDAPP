@@ -4,7 +4,7 @@
 // unseen behind an old cached index.html. The app shell is now network-first
 // with a cache fallback: online you always get the newest build, offline you
 // still get the last one that worked.
-const CACHE = 'fireraven-v5';
+const CACHE = 'fireraven-v6';
 const ASSETS = [
   './',
   './index.html',

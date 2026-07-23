@@ -279,7 +279,7 @@ const LS_APIKEY = 'fireraven_key';
 const LS_PIN = 'fireraven_pin';     // { salt, hash, iters } — never the PIN itself
 const LS_SEEN = 'fireraven_seen';   // last-active timestamp, for auto-lock
 const LS_FAIL = 'fireraven_fail';   // { n, until } — PIN attempt throttling
-const APP_VERSION = 5;
+const APP_VERSION = 6;
 
 /* ── App lock ──────────────────────────────────────────────────────────
    The starting PIN is 1177, but this repository is public, so only a
@@ -995,6 +995,52 @@ async function llm({ system, messages, max_tokens }){
   if (!r.ok){ const t=await r.text().catch(()=> ''); throw new Error('API '+r.status+' '+t.slice(0,140)); }
   const j = await r.json();
   return (j.content||[]).map(c=>c.text||'').join('').trim();
+}
+
+/* Mobile keyboards are the enemy of a pasted secret. iOS/Android "smart
+   punctuation" silently swaps a plain hyphen for an en/em dash in text that
+   passed through Notes, Messages, or an email client before being copied —
+   invisible once masked in a password field, and a valid-looking string that
+   the API will flat-out reject. Password-type inputs can also get hijacked by
+   a browser's "suggest/save password" autofill with zero visible sign.
+   This strips whitespace, undoes the dash swap, and rejects the couple of
+   near-miss shapes that would otherwise pass a naive check.                 */
+function sanitizeKey(raw){
+  return String(raw||'')
+    .replace(/[\u2010-\u2015\u2212]/g, '-')     // en/em/figure dash, minus sign -> hyphen
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')       // zero-width space/joiner/BOM from copy-paste
+    .replace(/\s+/g, '');                          // any whitespace, not just the ends
+}
+async function saveKeyChecked(){
+  const raw = ($('#key-input').value||'');
+  const k = sanitizeKey(raw);
+  if (!k){ toast('Paste your key first','err'); return; }
+  if (!/^sk-ant-/.test(k)){
+    S.ui.keyMsg={ ok:false, text:'Anthropic keys start with "sk-ant-" — this doesn\'t look like one. Get yours at console.anthropic.com.' };
+    render(); return;
+  }
+  if (k !== raw.trim()) toast('Cleaned up some stray characters from the paste','ok');
+
+  S.ui.keyBusy=true; S.ui.keyMsg=null; render();
+  const prevKey=S.apiKey;
+  S.apiKey=k;                                   // llm() reads S.apiKey directly
+  try {
+    await llm({ max_tokens:8, messages:[{ role:'user', content:'Reply with just: ok' }] });
+    try{ localStorage.setItem(LS_APIKEY,k); }catch(e){}
+    S.ui.keyMsg={ ok:true, text:'Verified with Anthropic — AI features are on.' };
+    S.ui.showKey=false;
+    toast('Key verified and saved','ok');
+  } catch(err){
+    S.apiKey=prevKey;                           // don't keep a key that just failed
+    const msg=String(err&&err.message||err);
+    S.ui.keyMsg={ ok:false, text:
+      msg.startsWith('API 401') ? 'Anthropic rejected this key (401) — it may be revoked, or copied from the wrong project. Generate a fresh one at console.anthropic.com.' :
+      msg.startsWith('API 403') ? 'This key doesn\'t have permission (403) — check it\'s active and has credit at console.anthropic.com.' :
+      msg.startsWith('API 429') ? 'Key looks valid, but the account is rate-limited or out of credit (429). Check console.anthropic.com.' :
+      msg.startsWith('API')     ? 'Anthropic returned an error — check the key and your account at console.anthropic.com.' :
+      'Could not reach Anthropic to verify — check your connection and try again.' };
+  }
+  S.ui.keyBusy=false; render();
 }
 
 // ---- cheaper-alternative finder ----------------------------------------
@@ -2173,12 +2219,24 @@ function viewSettings(){
     <div class="section-label">FireRaven AI</div>
     <div class="card card-tight">
       <div class="row"><div class="raven" style="width:34px;height:34px"></div>
-        <div class="grow"><div style="font-size:14px;font-weight:600">Anthropic API key</div><div class="muted" style="font-size:11px">${hasKey()?'Connected — screenshot reading & live chat are on':'Not set — using built-in tips & manual entry'}</div></div>
+        <div class="grow"><div style="font-size:14px;font-weight:600">Anthropic API key</div>
+          <div class="muted" style="font-size:11px">${hasKey()?`Saved — ends in …${esc(S.apiKey.slice(-4))}`:'Not set — using built-in tips & manual entry'}</div></div>
         <span class="swatch" style="border-radius:50%;background:${hasKey()?'var(--good)':'var(--muted)'}"></span></div>
-      <input class="input" id="key-input" type="password" placeholder="sk-ant-..." value="">
-      <div class="row" style="gap:8px"><button class="btn btn-primary" data-act="saveKey" style="font-size:13px">Save key</button>${hasKey()?`<button class="btn btn-ghost" data-act="removeKey" style="font-size:13px">Remove</button>`:''}</div>
+      <div class="row" style="gap:8px">
+        <input class="input grow" id="key-input" type="${S.ui.showKey?'text':'password'}" placeholder="sk-ant-..." value=""
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+          data-lpignore="true" data-1p-ignore data-bwignore data-form-type="other">
+        <button class="icon-btn" data-act="toggleKeyVis" style="flex:none" title="${S.ui.showKey?'Hide':'Show'}">${S.ui.showKey
+          ? '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>'
+          : '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3l18 18M10.6 10.6a3 3 0 004.2 4.2M9.9 5.1A10.6 10.6 0 0112 5c6.5 0 10 7 10 7a13.9 13.9 0 01-3.1 4M6.6 6.6A13.7 13.7 0 002 12s3.5 7 10 7c1.3 0 2.5-.2 3.6-.6"/></svg>'}</button>
+      </div>
+      <div class="row" style="gap:8px">
+        <button class="btn btn-primary" data-act="saveKey" style="font-size:13px" ${S.ui.keyBusy?'disabled':''}>${S.ui.keyBusy?'Checking…':'Save key'}</button>
+        ${hasKey()?`<button class="btn btn-ghost" data-act="removeKey" style="font-size:13px">Remove</button>`:''}
+      </div>
+      ${S.ui.keyMsg?`<div style="font-size:12px" class="${S.ui.keyMsg.ok?'good':'bad'}">${S.ui.keyMsg.ok?'✓':'✗'} ${esc(S.ui.keyMsg.text)}</div>`:''}
       <div class="field"><label>Model</label><select class="input" id="model-select" data-field="model">${MODELS.map(m=>`<option value="${m.id}" ${st.model===m.id?'selected':''}>${m.label}</option>`).join('')}</select></div>
-      <div class="muted" style="font-size:11px;line-height:1.55">Stored only on this device — sent only to Anthropic when you scan or chat. Get a key at console.anthropic.com. Without one, FireRaven still works with CSV import, manual entry and built-in tips.</div>
+      <div class="muted" style="font-size:11px;line-height:1.55">Stored only on this device — sent only to Anthropic when you scan or chat. Saving now runs a real, tiny test call so you know immediately if it works, rather than finding out mid-scan. Get a key at console.anthropic.com. Without one, FireRaven still works with CSV import, manual entry and built-in tips.</div>
     </div>
 
     <div class="section-label">Assistant</div>
@@ -2566,9 +2624,9 @@ const H = {
   send: ()=>{ const el=$('#chat-input'); ask(el?el.value:''); },
 
   // settings
-  saveKey: ()=>{ const k=($('#key-input').value||'').trim(); if(!k){ toast('Paste your key first','err'); return; }
-    S.apiKey=k; try{ localStorage.setItem(LS_APIKEY,k); }catch(e){} render(); toast('Key saved — AI features on','ok'); },
-  removeKey: ()=>{ S.apiKey=''; try{ localStorage.removeItem(LS_APIKEY); }catch(e){} render(); toast('Key removed','ok'); },
+  saveKey: ()=>{ saveKeyChecked(); },
+  toggleKeyVis: ()=>{ S.ui.showKey=!S.ui.showKey; render(); },
+  removeKey: ()=>{ S.apiKey=''; S.ui.keyMsg=null; try{ localStorage.removeItem(LS_APIKEY); }catch(e){} render(); toast('Key removed','ok'); },
   toggleInsights: ()=>{ S.data.settings.insightsOn=!S.data.settings.insightsOn; save(); render(); },
   editBudget: ()=>{ S.ui.modal={ kind:'number', title:'Monthly budget', desc:'Your target spend per month in '+cur()+'.', value:S.data.settings.monthlyBudget, on:'budget' }; render(); },
   editCurrency: ()=>{ S.ui.modal={ kind:'currency' }; render(); },
